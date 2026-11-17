@@ -35,7 +35,7 @@ function App() {
         canvas.height = viewport.height
         canvas.style.width = `${viewport.width / (window.devicePixelRatio || 1)}px`
         canvas.style.height = `${viewport.height / (window.devicePixelRatio || 1)}px`
-        await pdfPage.render({ canvasContext: context, viewport }).promise
+        await pdfPage.render({ canvas, canvasContext: context, viewport }).promise
       } catch {
         if (!cancelled) setError('Không thể hiển thị trang PDF này. Anh thử tệp PDF khác nhé.')
       } finally {
