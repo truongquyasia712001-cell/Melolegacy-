@@ -34,7 +34,8 @@ function parseMusicXml(xml: string): ImportedScore {
         const quarterLength = Number(note.querySelector('duration')?.textContent || divisions) / divisions
         const duration = durationMap.reduce((best, item) => Math.abs(item[0] - quarterLength) < Math.abs(best[0] - quarterLength) ? item : best, durationMap[2])[1]
         const dotted = !!note.querySelector('dot')
-        const localStaff = Math.max(0, Number(note.querySelector('staff')?.textContent || '1') - 1)\n        notes.push({ id: id++, staff: staffOffset + localStaff, measure: measureIndex, key: step + '/' + octave, duration, dotted, accidental, rest })
+        const localStaff = Math.max(0, Number(note.querySelector('staff')?.textContent || '1') - 1)
+        notes.push({ id: id++, staff: staffOffset + localStaff, measure: measureIndex, key: step + '/' + octave, duration, dotted, accidental, rest })
       })
     })
     staffOffset += detectedStaffCount
