@@ -89,7 +89,6 @@ function App() {
   const measureCount = Math.max(4, ...notes.map(note => note.measure + 1))
   const baseSystems = layout === 'solo' ? 10 : layout === 'large' ? 6 : 5
   const systems = Math.max(baseSystems, Math.ceil(measureCount / 4))
-  const importedStaffCount = Math.max(1, ...notes.map(note => note.staff + 1))
   const stavesPerSystem = layout === 'grand' ? 2 : layout === 'orchestra' ? (importedPartCount ?? 4) : 1
   const systemGap = layout === 'grand' ? GRAND_GAP : layout === 'orchestra' ? Math.max(SYSTEM_GAP, (stavesPerSystem - 1) * 68 + STAFF_HEIGHT + 30) : SYSTEM_GAP
   const paperHeight = Math.max(1123, 190 + systems * systemGap)
