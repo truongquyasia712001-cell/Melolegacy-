@@ -8,7 +8,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl python3 python3-venv fonts-dejavu-core \
-    libasound2t64 libfontconfig1 libfreetype6 libxrender1 libxtst6 \
+    libasound2t64 libfontconfig1 libfreetype6 libgtk-3-0t64 libxrender1 libxtst6 \
     && rm -rf /var/lib/apt/lists/*
 
 ARG AUDIVERIS_VERSION=5.11.0
