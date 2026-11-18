@@ -17,9 +17,9 @@ const SYSTEM_GAP = 96
 const GRAND_GAP = 142
 const STAFF_SPACING = 9
 
-function makeVexNote(item: NoteItem) {
+function makeVexNote(item: NoteItem, clef: string) {
   const duration = item.duration + (item.dotted ? 'd' : '') + (item.rest ? 'r' : '')
-  const note = new StaveNote({ keys: [item.rest ? 'b/4' : item.key], duration, clef: 'treble' })
+  const note = new StaveNote({ keys: [item.rest ? 'b/4' : item.key], duration, clef })
   if (item.accidental && !item.rest) note.addModifier(new Accidental(item.accidental), 0)
   return note
 }
@@ -92,7 +92,7 @@ function App() {
             const items = grouped.get(staffIndex + ':' + bar) || []
             if (!items.length) continue
             const tickables = items.map(item => {
-              const note = makeVexNote(item)
+              const note = makeVexNote(item, activeClef)
               if (item.dotted) note.addModifier // VexFlow duration carries the dot
               return note
             })
@@ -139,13 +139,13 @@ function App() {
     }
     const staffIndex = system * stavesPerSystem + part
     const staffY = SYSTEM_TOP + system * (layout === 'grand' ? GRAND_GAP : SYSTEM_GAP) + part * 68
-    const bottomLine = staffY + 4 * STAFF_SPACING
-    const step = Math.round((bottomLine - localY - (staffY - (SYSTEM_TOP + system * (layout === 'grand' ? GRAND_GAP : SYSTEM_GAP) + part * 68))) / (STAFF_SPACING / 2))
-    const noteNames = activeClef === 'bass' ? ['g', 'a', 'b', 'c', 'd', 'e', 'f'] : activeClef === 'alto' ? ['f', 'g', 'a', 'b', 'c', 'd', 'e'] : ['e', 'f', 'g', 'a', 'b', 'c', 'd']
-    const octaveOffset = activeClef === 'bass' ? 2 : 3
-    const absolute = Math.max(0, Math.min(34, step))
-    const name = noteNames[((absolute % 7) + 7) % 7] || DIATONIC[absolute % 7]
-    const octave = octaveOffset + Math.floor(absolute / 7)
+    const relativeY = y - staffY
+    const step = Math.round((4 * STAFF_SPACING - relativeY) / (STAFF_SPACING / 2))
+    const baseIndex = activeClef === 'bass' ? 4 : activeClef === 'alto' ? 3 : activeClef === 'tenor' ? 1 : 2
+    const baseOctave = activeClef === 'bass' ? 2 : 3 + (activeClef === 'treble' ? 1 : 0)
+    const pitchIndex = baseIndex + step
+    const name = DIATONIC[((pitchIndex % 7) + 7) % 7]
+    const octave = baseOctave + Math.floor(pitchIndex / 7)
     const key = name + '/' + octave
     const barWidth = (Math.max(700, scoreRef.current.clientWidth || 760) - 84) / 4
     const measure = Math.max(0, Math.min(3, Math.floor((x - 42) / barWidth)))
