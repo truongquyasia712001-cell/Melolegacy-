@@ -13,7 +13,7 @@ from typing import Any
 
 from fastapi import BackgroundTasks, Depends, FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 APP_VERSION = "0.1.0"
 DATA_DIR = Path(os.getenv("OMR_DATA_DIR", "/data"))
@@ -233,6 +233,52 @@ def read_job(job_id: str) -> dict[str, Any]:
     if row is None:
         raise HTTPException(status_code=404, detail="Recognition job not found.")
     return public_job(row)
+
+
+
+@app.get("/v1/jobs/{job_id}/musicxml", dependencies=[Depends(authorize)])
+def read_musicxml(job_id: str) -> Response:
+    row = get_job(job_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Recognition job not found.")
+    if row["status"] != "completed" or not row["result_path"]:
+        raise HTTPException(status_code=409, detail="MusicXML result is not ready.")
+    archive_path = Path(row["result_path"]).resolve()
+    if JOBS_DIR.resolve() not in archive_path.parents or not archive_path.is_file():
+        raise HTTPException(status_code=404, detail="Recognition result is no longer available.")
+
+    try:
+        with zipfile.ZipFile(archive_path) as archive:
+            names = archive.namelist()
+            xml_candidates = [name for name in names if name.lower().endswith(".musicxml")]
+            if not xml_candidates:
+                mxl_candidates = [name for name in names if name.lower().endswith(".mxl")]
+                if not mxl_candidates:
+                    raise RuntimeError("No MusicXML or compressed MXL file was found.")
+                with zipfile.ZipFile(archive.open(mxl_candidates[0])) as mxl:
+                    container = next((name for name in mxl.namelist() if name.lower() == "meta-inf/container.xml"), None)
+                    score_name = None
+                    if container:
+                        import xml.etree.ElementTree as ET
+                        root = ET.fromstring(mxl.read(container))
+                        for element in root.iter():
+                            if element.tag.endswith("rootfile") and element.attrib.get("full-path"):
+                                score_name = element.attrib["full-path"]
+                                break
+                    if not score_name:
+                        score_name = next((name for name in mxl.namelist() if name.lower().endswith((".musicxml", ".xml")) and not name.lower().startswith("meta-inf/")), None)
+                    if not score_name:
+                        raise RuntimeError("The MXL container does not identify a MusicXML score.")
+                    xml_bytes = mxl.read(score_name)
+            else:
+                xml_bytes = archive.read(xml_candidates[0])
+        return Response(
+            content=xml_bytes.decode("utf-8-sig"),
+            media_type="application/vnd.recordare.musicxml+xml",
+            headers={"Content-Disposition": f'inline; filename="melolegacy-{job_id}.musicxml"'},
+        )
+    except (zipfile.BadZipFile, KeyError, RuntimeError, UnicodeDecodeError) as error:
+        raise HTTPException(status_code=422, detail=f"Could not read MusicXML output: {error}") from error
 
 
 @app.get("/v1/jobs/{job_id}/result", dependencies=[Depends(authorize)])
