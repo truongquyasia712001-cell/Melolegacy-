@@ -24,7 +24,6 @@ function App() {
   }, [notes])
 
   const staffCount = layout === 'solo' ? 10 : layout === 'large' ? 6 : 5
-  const staffHeight = layout === 'large' ? 15 : 9
   const paperHeight = Math.max(1123, 220 + staffCount * (layout === 'grand' ? 150 : STAFF_GAP))
   const currentNotes = useMemo(() => notes.filter(n => n.staff < staffCount), [notes, staffCount])
 
