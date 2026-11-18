@@ -82,6 +82,7 @@ function App() {
   const [omrBusy, setOmrBusy] = useState(false)
   const [omrMessage, setOmrMessage] = useState('Chọn tệp PDF để nhận dạng bản nhạc.')
   const [omrJobId, setOmrJobId] = useState('')
+  const [importedPartCount, setImportedPartCount] = useState<number | null>(null)
   const pdfInputRef = useRef<HTMLInputElement>(null)
   const scoreRef = useRef<HTMLDivElement>(null)
 
@@ -89,8 +90,9 @@ function App() {
   const baseSystems = layout === 'solo' ? 10 : layout === 'large' ? 6 : 5
   const systems = Math.max(baseSystems, Math.ceil(measureCount / 4))
   const importedStaffCount = Math.max(1, ...notes.map(note => note.staff + 1))
-  const stavesPerSystem = layout === 'grand' ? 2 : layout === 'orchestra' ? Math.max(4, importedStaffCount) : 1
-  const paperHeight = Math.max(1123, 190 + systems * (layout === 'grand' ? GRAND_GAP : SYSTEM_GAP))
+  const stavesPerSystem = layout === 'grand' ? 2 : layout === 'orchestra' ? (importedPartCount ?? 4) : 1
+  const systemGap = layout === 'grand' ? GRAND_GAP : layout === 'orchestra' ? Math.max(SYSTEM_GAP, (stavesPerSystem - 1) * 68 + STAFF_HEIGHT + 30) : SYSTEM_GAP
+  const paperHeight = Math.max(1123, 190 + systems * systemGap)
 
   useEffect(() => {
     localStorage.setItem('melo-composer-notes-v2', JSON.stringify(notes))
@@ -119,7 +121,7 @@ function App() {
       const measureGap = 3
       const measureWidth = (width - margin * 2) / 4
       for (let system = 0; system < systems; system++) {
-        const baseY = SYSTEM_TOP + system * (layout === 'grand' ? GRAND_GAP : SYSTEM_GAP)
+        const baseY = SYSTEM_TOP + system * systemGap
         for (let part = 0; part < stavesPerSystem; part++) {
           const staffIndex = part
           const y = baseY + part * 68
@@ -176,7 +178,6 @@ function App() {
     const scaleX = viewBox.width / rect.width
     const x = (event.clientX - rect.left) * scaleX
     const y = (event.clientY - rect.top) * (viewBox.height / rect.height)
-    const systemGap = layout === 'grand' ? GRAND_GAP : SYSTEM_GAP
     const system = Math.round((y - SYSTEM_TOP) / systemGap)
     if (system < 0 || system >= systems) return
     const baseY = SYSTEM_TOP + system * systemGap
@@ -265,6 +266,7 @@ function App() {
       commit(imported.notes)
       setTitle(imported.title)
       setLayout(imported.partCount > 1 ? 'orchestra' : 'solo')
+      setImportedPartCount(imported.partCount)
       setOmrMessage('Đã nạp ' + imported.notes.length + ' ký hiệu từ ' + imported.partCount + ' bè. Anh có thể kiểm tra và chỉnh sửa trên khuông nhạc.')
       setStatus('Đã nhập bản nhạc từ MusicXML')
     } catch (error) {
