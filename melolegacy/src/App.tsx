@@ -150,7 +150,7 @@ function App() {
     const barWidth = (Math.max(700, scoreRef.current.clientWidth || 760) - 84) / 4
     const measure = Math.max(0, Math.min(3, Math.floor((x - 42) / barWidth)))
     const current = grouped.get(staffIndex + ':' + measure) || []
-    const beatLimit = Number(time.split('/')[0]) || 4
+    const beatLimit = ((Number(time.split('/')[0]) || 4) * 4) / (Number(time.split('/')[1]) || 4)
     const used = current.reduce((sum, n) => sum + BEATS[n.duration] * (n.dotted ? 1.5 : 1), 0)
     if (used + BEATS[duration] * (dotted ? 1.5 : 1) > beatLimit + 0.001) {
       setStatus('Ô nhịp đã đủ trường độ. Hãy chọn ô nhịp kế tiếp.')
