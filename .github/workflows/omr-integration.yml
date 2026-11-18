@@ -1,0 +1,32 @@
+name: Validate MeloLegacy PDF OMR integration
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [feature/audiveris-omr-pdf]
+
+jobs:
+  web-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: melolegacy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: melolegacy/package-lock.json
+      - run: npm install
+      - run: npm run build
+
+  omr-service-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Python syntax
+        run: python3 -m compileall -q melolegacy/omr-service/app
+      - name: Build Audiveris OMR container
+        run: docker build -t melolegacy-omr:ci melolegacy/omr-service
