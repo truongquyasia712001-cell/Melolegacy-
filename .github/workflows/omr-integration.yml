@@ -1,0 +1,46 @@
+name: Validate MeloLegacy PDF OMR integration
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [feature/audiveris-omr-pdf]
+
+jobs:
+  web-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: melolegacy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: melolegacy/package-lock.json
+      - run: npm install
+      - run: npm run build
+
+  omr-service-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Python syntax
+        run: python3 -m compileall -q melolegacy/omr-service/app
+      - name: Build Audiveris OMR container
+        run: docker build -t melolegacy-omr:ci melolegacy/omr-service
+      - name: Start OMR service
+        run: docker run -d --name melolegacy-omr-ci -p 8080:8080 -e OMR_ENV=development -v omr-ci-data:/data melolegacy-omr:ci
+      - name: Verify Audiveris engine and API health
+        run: |
+          for attempt in {1..45}; do
+            if curl -fsS http://localhost:8080/health > /tmp/omr-health.json; then break; fi
+            sleep 2
+          done
+          cat /tmp/omr-health.json
+          grep -q '"engine_available":"true"' /tmp/omr-health.json
+          docker exec melolegacy-omr-ci /opt/audiveris/bin/Audiveris -help
+      - name: Stop OMR service
+        if: always()
+        run: docker rm -f melolegacy-omr-ci || true

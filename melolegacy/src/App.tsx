@@ -5,6 +5,44 @@ import './App.css'
 type Duration = 'w' | 'h' | 'q' | '8' | '16' | '32'
 type NoteItem = { id: number; staff: number; measure: number; key: string; duration: Duration; dotted: boolean; accidental: '' | '#' | 'b' | 'n'; rest: boolean }
 type Layout = 'solo' | 'large' | 'grand' | 'orchestra'
+type ImportedScore = { notes: NoteItem[]; partCount: number; staffCount: number; title: string }
+function parseMusicXml(xml: string): ImportedScore {
+  const doc = new DOMParser().parseFromString(xml, 'application/xml')
+  if (doc.querySelector('parsererror')) throw new Error('Tệp MusicXML không hợp lệ.')
+  const parts = Array.from(doc.getElementsByTagName('part'))
+  if (!parts.length) throw new Error('Không tìm thấy bè nhạc trong MusicXML.')
+  const notes: NoteItem[] = []
+  let id = 1
+  const durationMap: [number, Duration][] = [[4,'w'],[2,'h'],[1,'q'],[0.5,'8'],[0.25,'16'],[0.125,'32']]
+  let staffOffset = 0
+  parts.forEach((part) => {
+    const measures = Array.from(part.getElementsByTagName('measure'))
+    const declaredStaffCount = Number(measures[0]?.querySelector('attributes > staves')?.textContent || '1')
+    const detectedStaffCount = Math.max(1, declaredStaffCount, ...measures.flatMap(measure =>
+      Array.from(measure.children).filter(el => el.tagName === 'note').map(note => Number(note.querySelector('staff')?.textContent || '1'))
+    ))
+    measures.forEach((measure, measureIndex) => {
+      const divisions = Number(measure.querySelector('attributes > divisions')?.textContent || '1')
+      Array.from(measure.children).filter(el => el.tagName === 'note').forEach(note => {
+        const pitch = note.querySelector('pitch')
+        const rest = !!note.querySelector('rest')
+        const step = (pitch?.querySelector('step')?.textContent || 'C').toLowerCase()
+        const octave = Number(pitch?.querySelector('octave')?.textContent || '4')
+        const alter = Number(pitch?.querySelector('alter')?.textContent || '0')
+        const accidentalNode = note.querySelector('accidental')?.textContent || ''
+        const accidental: NoteItem['accidental'] = accidentalNode === 'sharp' || alter > 0 ? '#' : accidentalNode === 'flat' || alter < 0 ? 'b' : accidentalNode === 'natural' ? 'n' : ''
+        const quarterLength = Number(note.querySelector('duration')?.textContent || divisions) / divisions
+        const duration = durationMap.reduce((best, item) => Math.abs(item[0] - quarterLength) < Math.abs(best[0] - quarterLength) ? item : best, durationMap[2])[1]
+        const dotted = !!note.querySelector('dot')
+        const localStaff = Math.max(0, Number(note.querySelector('staff')?.textContent || '1') - 1)
+        notes.push({ id: id++, staff: staffOffset + localStaff, measure: measureIndex, key: step + '/' + octave, duration, dotted, accidental, rest })
+      })
+    })
+    staffOffset += detectedStaffCount
+  })
+  const title = doc.querySelector('work > work-title')?.textContent || doc.querySelector('movement-title')?.textContent || 'Bản nhạc vừa nhận dạng'
+  return { notes, partCount: parts.length, staffCount: staffOffset, title }
+}
 const DURATIONS: { value: Duration; label: string; glyph: string }[] = [
   { value: 'w', label: 'Tròn', glyph: '𝅝' }, { value: 'h', label: 'Trắng', glyph: '𝅗𝅥' },
   { value: 'q', label: 'Đen', glyph: '♩' }, { value: '8', label: 'Móc đơn', glyph: '♪' },
@@ -48,11 +86,19 @@ function App() {
   const [status, setStatus] = useState('Đã lưu trên thiết bị')
   const [dynamic, setDynamic] = useState('mf')
   const [tempo, setTempo] = useState(80)
+  const [omrBusy, setOmrBusy] = useState(false)
+  const [omrMessage, setOmrMessage] = useState('Chọn tệp PDF để nhận dạng bản nhạc.')
+  const [omrJobId, setOmrJobId] = useState('')
+  const [importedStaffCount, setImportedStaffCount] = useState<number | null>(null)
+  const pdfInputRef = useRef<HTMLInputElement>(null)
   const scoreRef = useRef<HTMLDivElement>(null)
 
-  const systems = layout === 'solo' ? 10 : layout === 'large' ? 6 : layout === 'grand' ? 5 : 5
-  const stavesPerSystem = layout === 'grand' ? 2 : layout === 'orchestra' ? 4 : 1
-  const paperHeight = Math.max(1123, 190 + systems * (layout === 'grand' ? GRAND_GAP : SYSTEM_GAP))
+  const measureCount = Math.max(4, ...notes.map(note => note.measure + 1))
+  const baseSystems = layout === 'solo' ? 10 : layout === 'large' ? 6 : 5
+  const systems = Math.max(baseSystems, Math.ceil(measureCount / 4))
+  const stavesPerSystem = layout === 'grand' ? 2 : layout === 'orchestra' ? (importedStaffCount ?? 4) : 1
+  const systemGap = layout === 'grand' ? GRAND_GAP : layout === 'orchestra' ? Math.max(SYSTEM_GAP, (stavesPerSystem - 1) * 68 + STAFF_HEIGHT + 30) : SYSTEM_GAP
+  const paperHeight = Math.max(1123, 190 + systems * systemGap)
 
   useEffect(() => {
     localStorage.setItem('melo-composer-notes-v2', JSON.stringify(notes))
@@ -81,9 +127,9 @@ function App() {
       const measureGap = 3
       const measureWidth = (width - margin * 2) / 4
       for (let system = 0; system < systems; system++) {
-        const baseY = SYSTEM_TOP + system * (layout === 'grand' ? GRAND_GAP : SYSTEM_GAP)
+        const baseY = SYSTEM_TOP + system * systemGap
         for (let part = 0; part < stavesPerSystem; part++) {
-          const staffIndex = system * stavesPerSystem + part
+          const staffIndex = part
           const y = baseY + part * 68
           const activeClef = layout === 'grand' ? (part === 0 ? 'treble' : 'bass') : (layout === 'orchestra' && part > 0 ? 'bass' : clef)
           for (let bar = 0; bar < 4; bar++) {
@@ -95,7 +141,8 @@ function App() {
               if (keySig !== 'C') stave.addKeySignature(keySig)
             }
             stave.setContext(context).draw()
-            const items = grouped.get(staffIndex + ':' + bar) || []
+            const measureIndex = system * 4 + bar
+            const items = grouped.get(staffIndex + ':' + measureIndex) || []
             if (!items.length) continue
             const tickables = items.map(item => {
               const note = makeVexNote(item, activeClef)
@@ -137,7 +184,6 @@ function App() {
     const scaleX = viewBox.width / rect.width
     const x = (event.clientX - rect.left) * scaleX
     const y = (event.clientY - rect.top) * (viewBox.height / rect.height)
-    const systemGap = layout === 'grand' ? GRAND_GAP : SYSTEM_GAP
     const system = Math.round((y - SYSTEM_TOP) / systemGap)
     if (system < 0 || system >= systems) return
     const baseY = SYSTEM_TOP + system * systemGap
@@ -148,10 +194,10 @@ function App() {
       part = Math.abs(localY - 68) < Math.abs(localY) ? 1 : 0
       activeClef = part === 0 ? 'treble' : 'bass'
     } else if (layout === 'orchestra') {
-      part = Math.max(0, Math.min(3, Math.round(localY / 68)))
+      part = Math.max(0, Math.min(stavesPerSystem - 1, Math.round(localY / 68)))
       activeClef = part === 0 ? 'treble' : 'bass'
     }
-    const staffIndex = system * stavesPerSystem + part
+    const staffIndex = part
     const staffY = baseY + part * 68
     const bottom = CLEF_BOTTOM_NOTE[activeClef]
     // One diatonic step is exactly half the distance between staff lines.
@@ -162,14 +208,15 @@ function App() {
     const key = name + '/' + octave
     const measureWidth = (viewBox.width - 84) / 4
     const measure = Math.max(0, Math.min(3, Math.floor((x - 42) / measureWidth)))
-    const current = grouped.get(staffIndex + ':' + measure) || []
+    const measureIndex = system * 4 + measure
+    const current = grouped.get(staffIndex + ':' + measureIndex) || []
     const beatLimit = ((Number(time.split('/')[0]) || 4) * 4) / (Number(time.split('/')[1]) || 4)
     const used = current.reduce((sum, n) => sum + BEATS[n.duration] * (n.dotted ? 1.5 : 1), 0)
     if (used + BEATS[duration] * (dotted ? 1.5 : 1) > beatLimit + 0.001) {
       setStatus('Ô nhịp đã đủ trường độ. Hãy chọn ô nhịp kế tiếp.')
       return
     }
-    const item: NoteItem = { id: Date.now() + Math.random(), staff: staffIndex, measure, key, duration, dotted, accidental, rest }
+    const item: NoteItem = { id: Date.now() + Math.random(), staff: staffIndex, measure: measureIndex, key, duration, dotted, accidental, rest }
     commit([...notes, item])
     setStatus('Đã thêm ký hiệu vào ô nhịp')
   }
@@ -190,10 +237,60 @@ function App() {
     if (window.confirm('Xóa toàn bộ ký hiệu trên bản nhạc?')) commit([])
   }
 
+  async function recognizePdf(file?: File) {
+    if (!file) return
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      setOmrMessage('Chỉ nhận tệp PDF bản nhạc.')
+      return
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setOmrMessage('PDF này lớn hơn 4 MB. Cổng tải trung gian hiện tại chưa nhận tệp lớn; cần hoàn tất luồng tải trực tiếp lên máy chủ OMR trước khi xử lý tệp này.')
+      return
+    }
+    setOmrBusy(true)
+    setOmrJobId('')
+    setOmrMessage('Đang tải PDF lên dịch vụ nhận dạng…')
+    try {
+      const body = new FormData()
+      body.append('pdf', file)
+      const createdResponse = await fetch('/api/omr/jobs', { method: 'POST', body })
+      if (!createdResponse.ok) throw new Error(await createdResponse.text() || 'Không thể gửi PDF đến máy chủ nhận dạng.')
+      const created = await createdResponse.json() as { id: string }
+      setOmrJobId(created.id)
+      let completed = false
+      for (let attempt = 0; attempt < 450; attempt++) {
+        await new Promise(resolve => window.setTimeout(resolve, 2000))
+        const statusResponse = await fetch('/api/omr/jobs/' + encodeURIComponent(created.id))
+        if (!statusResponse.ok) throw new Error(await statusResponse.text() || 'Không đọc được trạng thái nhận dạng.')
+        const job = await statusResponse.json() as { status: string; error?: string }
+        if (job.status === 'failed') throw new Error(job.error || 'Audiveris không nhận dạng được tệp này.')
+        if (job.status === 'completed') { completed = true; break }
+        setOmrMessage(job.status === 'processing' ? 'Audiveris đang phân tích khuông nhạc, nốt và ký hiệu…' : 'PDF đã vào hàng đợi nhận dạng…')
+      }
+      if (!completed) throw new Error('Quá thời gian chờ nhận dạng. Anh có thể thử lại với PDF ít trang hơn.')
+      setOmrMessage('Đang nạp MusicXML vào trình soạn nhạc…')
+      const xmlResponse = await fetch('/api/omr/jobs/' + encodeURIComponent(created.id) + '/musicxml')
+      if (!xmlResponse.ok) throw new Error(await xmlResponse.text() || 'Không tải được MusicXML.')
+      const imported = parseMusicXml(await xmlResponse.text())
+      if (!imported.notes.length) throw new Error('MusicXML không có nốt nhạc để đưa vào trình soạn.')
+      commit(imported.notes)
+      setTitle(imported.title)
+      setLayout(imported.partCount > 1 ? 'orchestra' : 'solo')
+      setImportedStaffCount(imported.staffCount)
+      setOmrMessage('Đã nạp ' + imported.notes.length + ' ký hiệu từ ' + imported.partCount + ' bè. Anh có thể kiểm tra và chỉnh sửa trên khuông nhạc.')
+      setStatus('Đã nhập bản nhạc từ MusicXML')
+    } catch (error) {
+      setOmrMessage(error instanceof Error ? error.message : 'Có lỗi trong quá trình nhận dạng PDF.')
+    } finally {
+      setOmrBusy(false)
+      if (pdfInputRef.current) pdfInputRef.current.value = ''
+    }
+  }
+
   return <main className="app-shell">
     <header className="topbar">
       <div className="brand"><div className="brand-mark">M</div><div><strong>MeloLegacy</strong><span>PHÒNG SOẠN NHẠC</span></div></div>
-      <div className="top-actions"><span className="save-state"><i />{status}</span><button className="gold-button" onClick={() => window.print()}>Xuất / In</button></div>
+      <div className="top-actions"><span className="save-state"><i />{status}</span><button className="gold-button" onClick={() => window.print()}>Xuất PDF</button></div>
     </header>
     <section className="workspace">
       <aside className="tool-panel">
@@ -226,6 +323,11 @@ function App() {
         <div className="panel-foot">Bản nhạc lưu cục bộ trên thiết bị này.</div>
       </aside>
       <section className="score-area">
+        <div className="omr-panel">
+          <div className="omr-copy"><strong>Nhận dạng bản nhạc PDF</strong><span>{omrMessage}</span>{omrJobId && <small>Mã xử lý: {omrJobId}</small>}</div>
+          <input ref={pdfInputRef} type="file" accept="application/pdf,.pdf" disabled={omrBusy} onChange={event => recognizePdf(event.target.files?.[0])} />
+          <button className="gold-button" disabled={omrBusy} onClick={() => pdfInputRef.current?.click()}>{omrBusy ? 'Đang nhận dạng…' : 'Tải PDF lên'}</button>
+        </div>
         <div className="score-toolbar"><div><span className="crumb">MeloLegacy</span><span className="slash">/</span><b>Phòng Soạn Nhạc</b></div><div className="zoom-label">A4 · Dọc · {systems} hệ thống</div></div>
         <div className="paper-wrap"><div className="paper" style={{ minHeight: paperHeight }}>
           <div className="paper-head"><div className="paper-kicker">MELOLEGACY · MUSIC COMPOSITION</div><h1>{title || 'Tác phẩm mới'}</h1><div className="paper-meta"><span>Tác giả: __________________</span><span>♩ = {tempo}　{dynamic}</span></div></div>
