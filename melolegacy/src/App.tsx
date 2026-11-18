@@ -187,7 +187,7 @@ function App() {
       part = Math.abs(localY - 68) < Math.abs(localY) ? 1 : 0
       activeClef = part === 0 ? 'treble' : 'bass'
     } else if (layout === 'orchestra') {
-      part = Math.max(0, Math.min(3, Math.round(localY / 68)))
+      part = Math.max(0, Math.min(stavesPerSystem - 1, Math.round(localY / 68)))
       activeClef = part === 0 ? 'treble' : 'bass'
     }
     const staffIndex = part
