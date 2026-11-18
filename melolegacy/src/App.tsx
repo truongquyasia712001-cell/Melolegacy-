@@ -135,9 +135,8 @@ function App() {
     const rect = svg.getBoundingClientRect()
     const viewBox = svg.viewBox.baseVal
     const scaleX = viewBox.width / rect.width
-    const scaleY = viewBox.height / rect.height
     const x = (event.clientX - rect.left) * scaleX
-    const y = (event.clientY - rect.top) * scaleY
+    const y = (event.clientY - rect.top) * (viewBox.height / rect.height)
     const systemGap = layout === 'grand' ? GRAND_GAP : SYSTEM_GAP
     const system = Math.round((y - SYSTEM_TOP) / systemGap)
     if (system < 0 || system >= systems) return
@@ -154,7 +153,6 @@ function App() {
     }
     const staffIndex = system * stavesPerSystem + part
     const staffY = baseY + part * 68
-    const relativeY = y - staffY
     const bottom = CLEF_BOTTOM_NOTE[activeClef]
     // One diatonic step is exactly half the distance between staff lines.
     const step = Math.round((staffY + STAFF_HEIGHT - y) / (STAFF_SPACING / 2))
