@@ -140,6 +140,7 @@ def process_job(job_id: str) -> None:
                 "-batch",
                 "-export",
                 "-save",
+                "-swap",
                 "-output",
                 str(output_dir),
                 "--",
@@ -163,7 +164,7 @@ def process_job(job_id: str) -> None:
             archive_path = job_dir / "musicxml-results.zip"
             with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
                 for score_file in score_files:
-                    archive.write(score_file, arcname=score_file.name)
+                    archive.write(score_file, arcname=str(score_file.relative_to(output_dir)))
             update_job(
                 job_id,
                 status="completed",
