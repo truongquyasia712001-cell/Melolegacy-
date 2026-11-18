@@ -276,7 +276,7 @@ function App() {
       commit(imported.notes)
       setTitle(imported.title)
       setLayout(imported.partCount > 1 ? 'orchestra' : 'solo')
-      setImportedPartCount(imported.partCount)
+      setImportedStaffCount(imported.staffCount)
       setOmrMessage('Đã nạp ' + imported.notes.length + ' ký hiệu từ ' + imported.partCount + ' bè. Anh có thể kiểm tra và chỉnh sửa trên khuông nhạc.')
       setStatus('Đã nhập bản nhạc từ MusicXML')
     } catch (error) {
