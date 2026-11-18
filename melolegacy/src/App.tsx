@@ -46,7 +46,6 @@ function App() {
 
   const systems = layout === 'solo' ? 10 : layout === 'large' ? 6 : layout === 'grand' ? 5 : 5
   const stavesPerSystem = layout === 'grand' ? 2 : layout === 'orchestra' ? 4 : 1
-  const totalStaves = systems * stavesPerSystem
   const paperHeight = Math.max(1123, 190 + systems * (layout === 'grand' ? GRAND_GAP : SYSTEM_GAP))
 
   useEffect(() => {
@@ -97,7 +96,7 @@ function App() {
               if (item.dotted) note.addModifier // VexFlow duration carries the dot
               return note
             })
-            const voice = new Voice({ num_beats: Number(time.split('/')[0]) || 4, beat_value: Number(time.split('/')[1]) || 4 })
+            const voice = new Voice({ numBeats: Number(time.split('/')[0]) || 4, beatValue: Number(time.split('/')[1]) || 4 })
             voice.setMode(Voice.Mode.SOFT)
             voice.addTickables(tickables)
             new Formatter().joinVoices([voice]).format([voice], measureWidth - 58)
