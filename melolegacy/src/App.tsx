@@ -19,8 +19,8 @@ const STAFF_SPACING = 9
 const STAFF_LINE_COUNT = 5
 const STAFF_HEIGHT = (STAFF_LINE_COUNT - 1) * STAFF_SPACING
 const CLEF_BOTTOM_NOTE: Record<string, { index: number; octave: number }> = {
-  treble: { index: 2, octave: 4 }, bass: { index: 4, octave: 2 },
-  alto: { index: 5, octave: 3 }, tenor: { index: 0, octave: 3 },
+  treble: { index: 2, octave: 4 }, bass: { index: 6, octave: 2 },
+  alto: { index: 5, octave: 3 }, tenor: { index: 1, octave: 3 },
 }
 
 function makeVexNote(item: NoteItem, clef: string) {
