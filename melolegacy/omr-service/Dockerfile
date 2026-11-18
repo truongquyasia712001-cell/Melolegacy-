@@ -14,9 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ARG AUDIVERIS_VERSION=5.11.0
 ARG AUDIVERIS_DEB=Audiveris-5.11.0-ubuntu24.04-x86_64.deb
 RUN curl -fL "https://github.com/Audiveris/audiveris/releases/download/${AUDIVERIS_VERSION}/${AUDIVERIS_DEB}" -o /tmp/audiveris.deb \
-    && apt-get update \
-    && mkdir -p /usr/share/applications /usr/share/desktop-directories /usr/local/share/applications /usr/local/share/desktop-directories \
-    && apt-get install -y --no-install-recommends /tmp/audiveris.deb \
+    && dpkg-deb -x /tmp/audiveris.deb / \
     && rm -f /tmp/audiveris.deb \
     && rm -rf /var/lib/apt/lists/*
 
