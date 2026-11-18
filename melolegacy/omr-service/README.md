@@ -8,6 +8,7 @@ PDF-to-MusicXML worker service using the official Audiveris 5.11.0 Linux package
 - `POST /v1/jobs` — multipart upload with field name `pdf`; returns HTTP 202 and a job ID.
 - `GET /v1/jobs/{id}` — queued / processing / completed / failed state.
 - `GET /v1/jobs/{id}/result` — ZIP containing the MusicXML/MXL outputs.
+- `GET /v1/jobs/{id}/musicxml` — extracts and returns the first MusicXML score for direct import into Composer Room.
 
 The worker invokes Audiveris in headless batch mode:
 
@@ -30,11 +31,11 @@ docker run --rm -p 8080:8080 -v melolegacy-omr-data:/data \
 
 Then check `http://localhost:8080/health`.
 
-For a protected deployment, set `OMR_ENV=production` and `OMR_API_TOKEN`. Set `OMR_ALLOWED_ORIGINS` to the exact MeloLegacy origin(s), separated by commas. Never put the API token in a `VITE_*` browser variable.
+For a protected deployment, set `OMR_ENV=production` and `OMR_API_TOKEN`. Set `OMR_ALLOWED_ORIGINS` to the exact MeloLegacy origin(s), separated by commas. The MeloLegacy Vercel API proxy also requires server-side `OMR_SERVICE_URL` and `OMR_API_TOKEN` environment variables. Never put the API token in a `VITE_*` browser variable.
 
 ## Current pilot limits
 
-- Default upload cap: 40 MB (`OMR_MAX_UPLOAD_BYTES`).
+- OMR service upload cap: 40 MB (`OMR_MAX_UPLOAD_BYTES`). The current Vercel proxy UI intentionally limits uploads to 4 MB because Vercel Function request bodies have a much lower platform limit; larger PDFs require a direct, short-lived authenticated upload flow.
 - Default job timeout: 900 seconds (`OMR_JOB_TIMEOUT_SECONDS`).
 - Default concurrency: one Audiveris process (`OMR_MAX_CONCURRENT_JOBS`).
 - Job records and results are stored under `OMR_DATA_DIR` (default `/data`).
