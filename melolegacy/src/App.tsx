@@ -236,6 +236,10 @@ function App() {
       setOmrMessage('Chỉ nhận tệp PDF bản nhạc.')
       return
     }
+    if (file.size > 4 * 1024 * 1024) {
+      setOmrMessage('PDF này lớn hơn 4 MB. Cổng tải trung gian hiện tại chưa nhận tệp lớn; cần hoàn tất luồng tải trực tiếp lên máy chủ OMR trước khi xử lý tệp này.')
+      return
+    }
     setOmrBusy(true)
     setOmrJobId('')
     setOmrMessage('Đang tải PDF lên dịch vụ nhận dạng…')
