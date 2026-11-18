@@ -16,6 +16,12 @@ const SYSTEM_TOP = 94
 const SYSTEM_GAP = 96
 const GRAND_GAP = 142
 const STAFF_SPACING = 9
+const STAFF_LINE_COUNT = 5
+const STAFF_HEIGHT = (STAFF_LINE_COUNT - 1) * STAFF_SPACING
+const CLEF_BOTTOM_NOTE: Record<string, { index: number; octave: number }> = {
+  treble: { index: 2, octave: 4 }, bass: { index: 4, octave: 2 },
+  alto: { index: 5, octave: 3 }, tenor: { index: 0, octave: 3 },
+}
 
 function makeVexNote(item: NoteItem, clef: string) {
   const duration = item.duration + (item.dotted ? 'd' : '') + (item.rest ? 'r' : '')
@@ -67,7 +73,7 @@ function App() {
     if (!host) return
     host.innerHTML = ''
     try {
-      const width = Math.max(700, host.clientWidth || 760)
+      const width = Math.max(320, host.clientWidth || 760)
       const renderer = new Renderer(host, Renderer.Backends.SVG)
       renderer.resize(width, paperHeight)
       const context = renderer.getContext()
@@ -121,34 +127,43 @@ function App() {
   }
 
   function addFromCanvas(event: React.MouseEvent<HTMLDivElement>) {
-    if (!scoreRef.current) return
-    const rect = scoreRef.current.getBoundingClientRect()
-    const y = (event.clientY - rect.top) * (paperHeight / rect.height)
-    const x = (event.clientX - rect.left) * (Math.max(700, scoreRef.current.clientWidth || 760) / rect.width)
-    const system = Math.floor((y - SYSTEM_TOP + 20) / (layout === 'grand' ? GRAND_GAP : SYSTEM_GAP))
+    const host = scoreRef.current
+    const svg = host?.querySelector('svg')
+    if (!host || !svg) return
+    // Convert the pointer through the rendered SVG's actual viewBox. This keeps
+    // note placement aligned after responsive scaling, zooming and scrolling.
+    const rect = svg.getBoundingClientRect()
+    const viewBox = svg.viewBox.baseVal
+    const scaleX = viewBox.width / rect.width
+    const scaleY = viewBox.height / rect.height
+    const x = (event.clientX - rect.left) * scaleX
+    const y = (event.clientY - rect.top) * scaleY
+    const systemGap = layout === 'grand' ? GRAND_GAP : SYSTEM_GAP
+    const system = Math.round((y - SYSTEM_TOP) / systemGap)
     if (system < 0 || system >= systems) return
-    const localY = y - (SYSTEM_TOP + system * (layout === 'grand' ? GRAND_GAP : SYSTEM_GAP))
+    const baseY = SYSTEM_TOP + system * systemGap
+    const localY = y - baseY
     let part = 0
     let activeClef = clef
     if (layout === 'grand') {
-      part = localY > 62 ? 1 : 0
+      part = Math.abs(localY - 68) < Math.abs(localY) ? 1 : 0
       activeClef = part === 0 ? 'treble' : 'bass'
     } else if (layout === 'orchestra') {
-      part = Math.max(0, Math.min(3, Math.floor(localY / 68)))
+      part = Math.max(0, Math.min(3, Math.round(localY / 68)))
       activeClef = part === 0 ? 'treble' : 'bass'
     }
     const staffIndex = system * stavesPerSystem + part
-    const staffY = SYSTEM_TOP + system * (layout === 'grand' ? GRAND_GAP : SYSTEM_GAP) + part * 68
+    const staffY = baseY + part * 68
     const relativeY = y - staffY
-    const step = Math.round((4 * STAFF_SPACING - relativeY) / (STAFF_SPACING / 2))
-    const baseIndex = activeClef === 'bass' ? 4 : activeClef === 'alto' ? 3 : activeClef === 'tenor' ? 1 : 2
-    const baseOctave = activeClef === 'bass' ? 2 : 3 + (activeClef === 'treble' ? 1 : 0)
-    const pitchIndex = baseIndex + step
+    const bottom = CLEF_BOTTOM_NOTE[activeClef]
+    // One diatonic step is exactly half the distance between staff lines.
+    const step = Math.round((staffY + STAFF_HEIGHT - y) / (STAFF_SPACING / 2))
+    const pitchIndex = bottom.index + step
     const name = DIATONIC[((pitchIndex % 7) + 7) % 7]
-    const octave = baseOctave + Math.floor(pitchIndex / 7)
+    const octave = bottom.octave + Math.floor(pitchIndex / 7)
     const key = name + '/' + octave
-    const barWidth = (Math.max(700, scoreRef.current.clientWidth || 760) - 84) / 4
-    const measure = Math.max(0, Math.min(3, Math.floor((x - 42) / barWidth)))
+    const measureWidth = (viewBox.width - 84) / 4
+    const measure = Math.max(0, Math.min(3, Math.floor((x - 42) / measureWidth)))
     const current = grouped.get(staffIndex + ':' + measure) || []
     const beatLimit = ((Number(time.split('/')[0]) || 4) * 4) / (Number(time.split('/')[1]) || 4)
     const used = current.reduce((sum, n) => sum + BEATS[n.duration] * (n.dotted ? 1.5 : 1), 0)
