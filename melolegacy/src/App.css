@@ -4,3 +4,5 @@
 .map-toggle-button{border:1px solid #d8c49c;background:#fbf7ee;color:#795d2d;border-radius:7px;padding:8px 12px;font-size:11px;cursor:pointer}.map-toggle-button:hover{background:#f3ead8}@media(max-width:760px){.map-toggle-button{padding:7px 9px;font-size:10px}}
 
 .melo-map-loading{min-height:70vh;display:grid;place-items:center;color:#8b6c35;font:16px Georgia,serif;background:#f1eee8}
+
+.piano-play-button{width:100%;margin-top:2px;cursor:pointer;font-weight:650}.piano-play-button:disabled{opacity:.45;cursor:not-allowed}.notation-host [data-note-id].is-playing{filter:drop-shadow(0 0 3px #d3a344);opacity:.72}.notation-host [data-note-id].is-playing path{fill:#b48635!important;stroke:#b48635!important}
