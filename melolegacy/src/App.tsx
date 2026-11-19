@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Accidental, Beam, Formatter, Renderer, Stave, StaveNote, Voice } from 'vexflow'
+import { MeloEcosystem3D } from './MeloEcosystem3D'
 import './App.css'
 
 type Duration = 'w' | 'h' | 'q' | '8' | '16' | '32'
@@ -70,6 +71,7 @@ function makeVexNote(item: NoteItem, clef: string) {
 
 function App() {
   const [layout, setLayout] = useState<Layout>('solo')
+  const [showEcosystemMap, setShowEcosystemMap] = useState(false)
   const [duration, setDuration] = useState<Duration>('q')
   const [dotted, setDotted] = useState(false)
   const [rest, setRest] = useState(false)
@@ -289,10 +291,10 @@ function App() {
 
   return <main className="app-shell">
     <header className="topbar">
-      <div className="brand"><div className="brand-mark">M</div><div><strong>MeloLegacy</strong><span>PHÒNG SOẠN NHẠC</span></div></div>
-      <div className="top-actions"><span className="save-state"><i />{status}</span><button className="gold-button" onClick={() => window.print()}>Xuất PDF</button></div>
+      <div className="brand"><div className="brand-mark">M</div><div><strong>MeloLegacy</strong><span>{showEcosystemMap ? 'BẢN ĐỒ HỆ SINH THÁI 3D' : 'PHÒNG SOẠN NHẠC'}</span></div></div>
+      <div className="top-actions"><button className="map-toggle-button" onClick={() => setShowEcosystemMap(value => !value)}>{showEcosystemMap ? 'Phòng Soạn Nhạc' : 'Sơ đồ 3D'}</button><span className="save-state"><i />{status}</span><button className="gold-button" onClick={() => window.print()}>Xuất PDF</button></div>
     </header>
-    <section className="workspace">
+    {showEcosystemMap ? <MeloEcosystem3D onClose={() => setShowEcosystemMap(false)} /> : <section className="workspace">
       <aside className="tool-panel">
         <div className="panel-heading">TÁC PHẨM</div>
         <label className="field-label" htmlFor="score-title">Tên tác phẩm</label>
@@ -336,7 +338,7 @@ function App() {
         </div></div>
       </section>
     </section>
-    <footer className="mobile-note">Chọn trường độ rồi chạm vào khuông nhạc để ghi nốt. Xoay iPad ngang để có vùng làm việc rộng hơn.</footer>
+    <footer className="mobile-note">Chọn trường độ rồi chạm vào khuông nhạc để ghi nốt. Xoay iPad ngang để có vùng làm việc rộng hơn.</footer>}
   </main>
 }
 export default App
