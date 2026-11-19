@@ -36,6 +36,29 @@ export default function App() {
     return () => document.removeEventListener('pointerdown', close)
   }, [])
 
+  useEffect(() => {
+    const layer = document.querySelector<HTMLElement>('.pen-layer')
+    const host = document.querySelector<HTMLElement>('.notation-host')
+    if (!layer || !host) return
+    const place = () => {
+      const rect = host.getBoundingClientRect()
+      layer.style.top = rect.top + 'px'
+      layer.style.left = rect.left + 'px'
+      layer.style.width = rect.width + 'px'
+      layer.style.height = rect.height + 'px'
+    }
+    place()
+    const observer = new ResizeObserver(place)
+    observer.observe(host)
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
+    }
+  }, [])
+
   function locate(event: React.MouseEvent, kind: 'clef' | 'key' | 'time') {
     const target = event.target as Element
     const svg = target.closest('svg')
