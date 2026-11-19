@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { savePianoSampleBank, type PianoSample } from './pianoSamples'
+import { playPianoSample, savePianoSampleBank, type PianoSample } from './pianoSamples'
 
 const FIRST_MIDI = 40 // E2
 const LAST_MIDI = 84 // C6
@@ -51,6 +51,7 @@ function findNoteSegments(buffer: AudioBuffer): Array<{ start: number; end: numb
 
 export function PianoSampleBank({ onSaved }: { onSaved: (samples: PianoSample[]) => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const previewContextRef = useRef<AudioContext | null>(null)
   const [fileName, setFileName] = useState('')
   const [samples, setSamples] = useState<PianoSample[]>([])
   const [message, setMessage] = useState('Chưa có bộ sample thu âm. Tải bản ghi từng nốt E2 đến C6 để tạo thư viện piano.')
@@ -76,12 +77,12 @@ export function PianoSampleBank({ onSaved }: { onSaved: (samples: PianoSample[])
       if (!segments.length) throw new Error('Không phát hiện được các nốt tách biệt. Hãy kiểm tra bản ghi có khoảng lặng giữa các nốt.')
       const count = Math.min(segments.length, LAST_MIDI - FIRST_MIDI + 1)
       const channel = decoded.getChannelData(0)
-      const prepared = segments.slice(0, count).map((segment, index) => ({
-        midi: FIRST_MIDI + index,
-        sampleRate: decoded.sampleRate,
-        samples: channel.slice(segment.start, segment.end),
-        sourceName: file.name,
-      }))
+      const prepared = segments.slice(0, count).map((segment, index) => {
+        const samples = channel.slice(segment.start, segment.end)
+        const peak = samples.reduce((maximum, value) => Math.max(maximum, Math.abs(value)), 0)
+        if (peak > 0.0001) for (let i = 0; i < samples.length; i++) samples[i] = samples[i] * (0.82 / peak)
+        return { midi: FIRST_MIDI + index, sampleRate: decoded.sampleRate, samples, sourceName: file.name }
+      })
       setSamples(prepared)
       setFileName(file.name)
       setMessage('Đã tách ' + prepared.length + ' mẫu. Thứ tự được gán lần lượt từ E2 lên từng nửa cung; cần nghe đối chiếu trước khi dùng làm đàn chuẩn.')
@@ -92,6 +93,12 @@ export function PianoSampleBank({ onSaved }: { onSaved: (samples: PianoSample[])
       setBusy(false)
       if (inputRef.current) inputRef.current.value = ''
     }
+  }
+
+  async function preview(sample: PianoSample) {
+    const context = previewContextRef.current || (previewContextRef.current = new AudioContext())
+    await context.resume()
+    playPianoSample(context, sample, sample.midi, 1.2)
   }
 
   async function save() {
@@ -116,7 +123,7 @@ export function PianoSampleBank({ onSaved }: { onSaved: (samples: PianoSample[])
     {fileName && <div className="sample-file-name">{fileName}</div>}
     {samples.length > 0 && <>
       <div className="sample-summary"><strong>{samples.length}/{LAST_MIDI - FIRST_MIDI + 1} nốt</strong><span>{noteName(FIRST_MIDI)} – {noteName(FIRST_MIDI + samples.length - 1)}</span></div>
-      <div className="sample-note-grid">{samples.map(sample => <span key={sample.midi} title={noteName(sample.midi)}>{noteName(sample.midi)}</span>)}</div>
+      <div className="sample-note-grid">{samples.map(sample => <button type="button" key={sample.midi} title={'Nghe mẫu ' + noteName(sample.midi)} aria-label={'Nghe ' + noteName(sample.midi)} onClick={() => preview(sample)}>{noteName(sample.midi)}</button>)}</div>
       <button className="gold-button sample-save" disabled={busy} onClick={save}>Lưu bộ sample trên thiết bị</button>
     </>}
     <p className="hint" role="status">{message}</p>
