@@ -69,7 +69,7 @@ const CLEF_BOTTOM_NOTE: Record<string, { index: number; octave: number }> = {
 
 function makeVexNote(item: NoteItem, clef: string) {
   const duration = item.duration + (item.dotted ? 'd' : '') + (item.rest ? 'r' : '')
-  const note = new StaveNote({ keys: [item.rest ? 'b/4' : item.key], duration, clef })
+  const note = new StaveNote({ keys: [item.rest ? 'b/4' : item.key], duration, clef, glyph_font_scale: 34 })
   if (item.accidental && !item.rest) note.addModifier(new Accidental(item.accidental), 0)
   return note
 }
@@ -260,7 +260,7 @@ function App() {
             const x = margin + bar * measureWidth
             const stave = new Stave(x, y, measureWidth - measureGap, { spacingBetweenLinesPx: STAFF_SPACING })
             if (bar === 0) {
-              stave.addClef(activeClef)
+              stave.addClef(activeClef, 'small')
               stave.addTimeSignature(time)
               if (keySig !== 'C') stave.addKeySignature(keySig)
             }
