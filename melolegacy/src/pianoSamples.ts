@@ -65,7 +65,7 @@ export function playPianoSample(
   seconds: number,
 ): void {
   const audioBuffer = context.createBuffer(1, sample.samples.length, sample.sampleRate)
-  audioBuffer.copyToChannel(sample.samples, 0)
+  audioBuffer.getChannelData(0).set(sample.samples)
   const source = context.createBufferSource()
   source.buffer = audioBuffer
   source.playbackRate.setValueAtTime(Math.pow(2, (targetMidi - sample.midi) / 12), context.currentTime)
