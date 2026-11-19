@@ -98,6 +98,7 @@ function App() {
   const [omrJobId, setOmrJobId] = useState('')
   const [importedStaffCount, setImportedStaffCount] = useState<number | null>(null)
   const pdfInputRef = useRef<HTMLInputElement>(null)
+  const backupInputRef = useRef<HTMLInputElement>(null)
   const scoreRef = useRef<HTMLDivElement>(null)
 
   const measureCount = Math.max(4, ...notes.map(note => note.measure + 1))
@@ -138,6 +139,62 @@ function App() {
       .then(() => setStatus('Đã lưu trên thiết bị'))
       .catch(error => setStatus(error instanceof Error ? error.message : 'Không lưu được dữ liệu trên thiết bị'))
   }, [storageReady, notes, title, layout, clef, time, keySig, tempo, dynamic, sourceMusicXml])
+
+  function downloadScoreBackup() {
+    const backup = {
+      format: 'MeloLegacyScoreBackup', version: 1, exportedAt: new Date().toISOString(),
+      notes, title, layout, clef, time, keySig, tempo, dynamic, sourceMusicXml,
+    }
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'melolegacy-sao-luu-tac-pham.json'
+    link.click()
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
+  async function restoreScoreBackup(file?: File) {
+    if (!file) return
+    try {
+      const candidate: unknown = JSON.parse(await file.text())
+      if (!candidate || typeof candidate !== 'object') throw new Error('Tệp sao lưu không đúng định dạng MeloLegacy.')
+      const data = candidate as Record<string, unknown>
+      const validNotes = Array.isArray(data.notes) && data.notes.every(value => {
+        if (!value || typeof value !== 'object') return false
+        const note = value as Record<string, unknown>
+        return typeof note.id === 'number' && Number.isInteger(note.staff) && Number.isInteger(note.measure)
+          && typeof note.key === 'string' && ['w', 'h', 'q', '8', '16', '32'].includes(String(note.duration))
+          && typeof note.dotted === 'boolean' && ['', '#', 'b', 'n'].includes(String(note.accidental))
+          && typeof note.rest === 'boolean'
+      })
+      if (data.format !== 'MeloLegacyScoreBackup' || data.version !== 1 || !validNotes
+        || typeof data.title !== 'string' || typeof data.layout !== 'string'
+        || !['solo', 'large', 'grand', 'orchestra'].includes(data.layout)
+        || typeof data.clef !== 'string' || !['treble', 'bass', 'alto', 'tenor'].includes(data.clef)
+        || typeof data.time !== 'string' || typeof data.keySig !== 'string'
+        || typeof data.tempo !== 'number' || typeof data.dynamic !== 'string'
+        || !(typeof data.sourceMusicXml === 'string' || data.sourceMusicXml === null)) {
+        throw new Error('Tệp sao lưu thiếu dữ liệu hoặc không tương thích với phiên bản này.')
+      }
+      if (!window.confirm('Khôi phục bản sao lưu sẽ thay thế tác phẩm đang mở. Anh muốn tiếp tục không?')) return
+      commit(data.notes as NoteItem[])
+      setTitle(data.title)
+      setLayout(data.layout as Layout)
+      setClef(data.clef as typeof clef)
+      setTime(data.time)
+      setKeySig(data.keySig)
+      setTempo(data.tempo)
+      setDynamic(data.dynamic)
+      setSourceMusicXml(data.sourceMusicXml)
+      setOmrMessage('Đã khôi phục bản sao lưu trên thiết bị.')
+      setStatus('Đã khôi phục bản sao lưu')
+    } catch (error) {
+      setOmrMessage(error instanceof Error ? error.message : 'Không thể đọc tệp sao lưu.')
+    } finally {
+      if (backupInputRef.current) backupInputRef.current.value = ''
+    }
+  }
 
   function downloadOriginalMusicXml() {
     if (!sourceMusicXml) return
@@ -355,6 +412,10 @@ function App() {
             <label className="field-label" htmlFor="score-title">Tên tác phẩm</label><input id="score-title" className="title-input" value={title} onChange={e => setTitle(e.target.value)} />
             <div className="tool-divider-line" />
             <input ref={pdfInputRef} className="visually-hidden-input" type="file" accept="application/pdf,.pdf" disabled={omrBusy} onChange={event => recognizePdf(event.target.files?.[0])} />
+            <input ref={backupInputRef} className="visually-hidden-input" type="file" accept="application/json,.json" onChange={event => restoreScoreBackup(event.target.files?.[0])} />
+            <button className="tool-action" onClick={downloadScoreBackup}><span>⇩</span>Sao lưu toàn bộ tác phẩm</button>
+            <button className="tool-action" onClick={() => backupInputRef.current?.click()}><span>↥</span>Khôi phục từ bản sao lưu</button>
+            <div className="tool-divider-line" />
             <button className="tool-action primary" disabled={omrBusy} onClick={() => pdfInputRef.current?.click()}><span>⇧</span>{omrBusy ? 'Đang nhận dạng PDF…' : 'Nhập PDF và nhận dạng'}</button>
             <p className="tool-help">{omrMessage}</p>{omrJobId && <small className="tool-help">Mã xử lý: {omrJobId}</small>}
             {sourceMusicXml && <><p className="tool-help">Bản MusicXML gốc được giữ riêng, không bị thay thế khi chỉnh sửa bản làm việc.</p><button className="tool-action" onClick={downloadOriginalMusicXml}><span>⇩</span>Tải MusicXML gốc</button></>}
