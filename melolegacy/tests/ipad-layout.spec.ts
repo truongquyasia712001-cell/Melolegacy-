@@ -56,7 +56,9 @@ test('selected branch details update and reset when changing rooms', async ({ pa
 test('room nodes have touch targets of at least 44 by 44 CSS pixels', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Bản đồ Melo' }).click()
-  const sizes = await page.locator('.melo-room-node').evaluateAll(nodes =>
+  const roomNodes = page.locator('.melo-map-stage button[aria-pressed]')
+  await expect(roomNodes).toHaveCount(13)
+  const sizes = await roomNodes.evaluateAll(nodes =>
     nodes.map(node => {
       const rect = node.getBoundingClientRect()
       return { label: node.textContent?.trim(), width: rect.width, height: rect.height }
@@ -74,7 +76,9 @@ test('room nodes do not overlap in either map view', async ({ page }) => {
   await page.getByRole('button', { name: 'Bản đồ Melo' }).click()
   for (const viewName of ['Sơ đồ Neuron', 'Bản đồ Đàn Thiên Thần']) {
     await page.getByRole('button', { name: new RegExp(viewName) }).click()
-    const overlaps = await page.locator('.melo-room-node').evaluateAll(nodes => {
+    const roomNodes = page.locator('.melo-map-stage button[aria-pressed]')
+    await expect(roomNodes).toHaveCount(13)
+    const overlaps = await roomNodes.evaluateAll(nodes => {
       const rects = nodes.map(node => {
         const r = node.getBoundingClientRect()
         return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, label: node.textContent?.trim() }
