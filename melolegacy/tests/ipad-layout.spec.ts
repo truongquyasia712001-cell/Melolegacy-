@@ -122,3 +122,33 @@ test('piano reading controls support slow playback and stop on iPad browsers', a
   await expect(page.getByRole('button', { name: /Dừng đọc/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /Nghe piano & đọc nốt/ })).toBeVisible({ timeout: 5000 })
 })
+
+test('piano recording import extracts and stores chromatic samples locally', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByText('THƯ VIỆN SAMPLE PIANO')).toBeVisible()
+  const sampleRate = 16000
+  const sections = [
+    { frequency: 82.41, seconds: 0.32 },
+    { frequency: 87.31, seconds: 0.32 },
+    { frequency: 92.5, seconds: 0.32 },
+  ]
+  const pcm: number[] = []
+  for (const section of sections) {
+    const count = Math.floor(sampleRate * section.seconds)
+    for (let i = 0; i < count; i++) pcm.push(Math.round(Math.sin(2 * Math.PI * section.frequency * i / sampleRate) * 5000))
+    for (let i = 0; i < sampleRate * 0.2; i++) pcm.push(0)
+  }
+  const dataSize = pcm.length * 2
+  const wav = Buffer.alloc(44 + dataSize)
+  wav.write('RIFF', 0); wav.writeUInt32LE(36 + dataSize, 4); wav.write('WAVE', 8)
+  wav.write('fmt ', 12); wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20)
+  wav.writeUInt16LE(1, 22); wav.writeUInt32LE(sampleRate, 24)
+  wav.writeUInt32LE(sampleRate * 2, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34)
+  wav.write('data', 36); wav.writeUInt32LE(dataSize, 40)
+  pcm.forEach((value, index) => wav.writeInt16LE(value, 44 + index * 2))
+  await page.locator('input[accept*="audio/"]').setInputFiles({ name: 'piano-test.wav', mimeType: 'audio/wav', buffer: wav })
+  await expect(page.getByText('3/45 nốt')).toBeVisible()
+  await expect(page.getByText('E2')).toBeVisible()
+  await page.getByRole('button', { name: 'Lưu bộ sample trên thiết bị' }).click()
+  await expect(page.getByRole('status')).toContainText('Đã lưu 3 sample piano')
+})
