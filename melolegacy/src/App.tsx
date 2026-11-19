@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { Accidental, Beam, Formatter, Renderer, Stave, StaveNote, Voice } from 'vexflow'
+import { Accidental, Beam, Formatter, Renderer, Stave, StaveNote, Voice, loadFonts, setFonts } from 'vexflow'
 import './App.css'
 import { loadLocalScore, saveLocalScore } from './localScoreStore'
 
@@ -53,12 +53,15 @@ const DURATIONS: { value: Duration; label: string; glyph: string }[] = [
 ]
 const DIATONIC = ['c', 'd', 'e', 'f', 'g', 'a', 'b']
 const BEATS: Record<Duration, number> = { w: 4, h: 2, q: 1, '8': .5, '16': .25, '32': .125 }
-const SYSTEM_TOP = 94
-const SYSTEM_GAP = 96
-const GRAND_GAP = 142
-const STAFF_SPACING = 9
+const SYSTEM_TOP = 82
+const SYSTEM_GAP = 86
+const GRAND_GAP = 124
+const STAFF_GROUP_GAP = 62
+const STAFF_SPACING = 8
 const STAFF_LINE_COUNT = 5
 const STAFF_HEIGHT = (STAFF_LINE_COUNT - 1) * STAFF_SPACING
+const MEASURES_PER_SYSTEM = 3
+const SCORE_MARGIN = 34
 const CLEF_BOTTOM_NOTE: Record<string, { index: number; octave: number }> = {
   treble: { index: 2, octave: 4 }, bass: { index: 6, octave: 2 },
   alto: { index: 5, octave: 3 }, tenor: { index: 1, octave: 3 },
@@ -74,7 +77,7 @@ function makeVexNote(item: NoteItem, clef: string) {
 function App() {
   const [layout, setLayout] = useState<Layout>('solo')
   const [showEcosystemMap, setShowEcosystemMap] = useState(false)
-  const [activeTool, setActiveTool] = useState<'file' | 'layout' | 'notes' | 'score' | 'playback' | 'edit' | null>(null)
+  const [activeTool, setActiveTool] = useState<'file' | 'layout' | 'notes' | 'score' | 'playback' | 'edit' | 'write' | null>(null)
   const [duration, setDuration] = useState<Duration>('q')
   const [dotted, setDotted] = useState(false)
   const [rest, setRest] = useState(false)
@@ -90,6 +93,9 @@ function App() {
   const [future, setFuture] = useState<NoteItem[][]>([])
   const [status, setStatus] = useState('Đang mở dữ liệu trên thiết bị…')
   const [storageReady, setStorageReady] = useState(false)
+  const [musicFontReady, setMusicFontReady] = useState(false)
+  const handwritingCanvasRef = useRef<HTMLCanvasElement>(null)
+  const inkPointerRef = useRef<number | null>(null)
   const [sourceMusicXml, setSourceMusicXml] = useState<string | null>(null)
   const [dynamic, setDynamic] = useState('mf')
   const [tempo, setTempo] = useState(80)
@@ -103,10 +109,25 @@ function App() {
 
   const measureCount = Math.max(4, ...notes.map(note => note.measure + 1))
   const baseSystems = layout === 'solo' ? 10 : layout === 'large' ? 6 : 5
-  const systems = Math.max(baseSystems, Math.ceil(measureCount / 4))
+  const systems = Math.max(baseSystems, Math.ceil(measureCount / MEASURES_PER_SYSTEM))
   const stavesPerSystem = layout === 'grand' ? 2 : layout === 'orchestra' ? (importedStaffCount ?? 4) : 1
-  const systemGap = layout === 'grand' ? GRAND_GAP : layout === 'orchestra' ? Math.max(SYSTEM_GAP, (stavesPerSystem - 1) * 68 + STAFF_HEIGHT + 30) : SYSTEM_GAP
+  const systemGap = layout === 'grand' ? GRAND_GAP : layout === 'orchestra' ? Math.max(SYSTEM_GAP, (stavesPerSystem - 1) * STAFF_GROUP_GAP + STAFF_HEIGHT + 26) : SYSTEM_GAP
   const paperHeight = Math.max(1123, 190 + systems * systemGap)
+
+  useEffect(() => {
+    let active = true
+    loadFonts('Bravura', 'Academico').then(() => {
+      if (!active) return
+      setFonts('Bravura', 'Academico')
+      setMusicFontReady(true)
+    }).catch(() => {
+      if (active) {
+        setMusicFontReady(true)
+        setStatus('Đang dùng bộ ký âm tích hợp; không tải được phông chữ văn bản bổ trợ')
+      }
+    })
+    return () => { active = false }
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -221,29 +242,30 @@ function App() {
     if (!host) return
     host.innerHTML = ''
     try {
-      const width = Math.max(320, host.clientWidth || 760)
+      if (!musicFontReady) return
+    const width = Math.max(320, host.clientWidth || 760)
       const renderer = new Renderer(host, Renderer.Backends.SVG)
       renderer.resize(width, paperHeight)
       const context = renderer.getContext()
-      const margin = 42
+      const margin = SCORE_MARGIN
       const measureGap = 3
-      const measureWidth = (width - margin * 2) / 4
+      const measureWidth = (width - margin * 2) / MEASURES_PER_SYSTEM
       for (let system = 0; system < systems; system++) {
         const baseY = SYSTEM_TOP + system * systemGap
         for (let part = 0; part < stavesPerSystem; part++) {
           const staffIndex = part
-          const y = baseY + part * 68
+          const y = baseY + part * STAFF_GROUP_GAP
           const activeClef = layout === 'grand' ? (part === 0 ? 'treble' : 'bass') : (layout === 'orchestra' && part > 0 ? 'bass' : clef)
-          for (let bar = 0; bar < 4; bar++) {
+          for (let bar = 0; bar < MEASURES_PER_SYSTEM; bar++) {
             const x = margin + bar * measureWidth
-            const stave = new Stave(x, y, measureWidth - measureGap)
+            const stave = new Stave(x, y, measureWidth - measureGap, { spacing_between_lines_px: STAFF_SPACING })
             if (bar === 0) {
               stave.addClef(activeClef)
               stave.addTimeSignature(time)
               if (keySig !== 'C') stave.addKeySignature(keySig)
             }
             stave.setContext(context).draw()
-            const measureIndex = system * 4 + bar
+            const measureIndex = system * MEASURES_PER_SYSTEM + bar
             const items = grouped.get(staffIndex + ':' + measureIndex) || []
             if (!items.length) continue
             const tickables = items.map(item => {
@@ -254,7 +276,7 @@ function App() {
             const voice = new Voice({ numBeats: Number(time.split('/')[0]) || 4, beatValue: Number(time.split('/')[1]) || 4 })
             voice.setMode(Voice.Mode.SOFT)
             voice.addTickables(tickables)
-            new Formatter().joinVoices([voice]).format([voice], measureWidth - 58)
+            new Formatter().joinVoices([voice]).format([voice], measureWidth - 48)
             voice.draw(context, stave)
             const beams = Beam.generateBeams(tickables)
             beams.forEach(beam => beam.setContext(context).draw())
@@ -267,7 +289,7 @@ function App() {
       console.error('Music engraving error', error)
       setStatus('Có lỗi khi dàn trang ký âm')
     }
-  }, [notes, layout, clef, time, keySig, systems, stavesPerSystem, paperHeight, grouped])
+  }, [notes, layout, clef, time, keySig, systems, stavesPerSystem, paperHeight, grouped, musicFontReady])
 
   function commit(next: NoteItem[]) {
     setHistory(prev => [...prev, notes])
@@ -293,14 +315,14 @@ function App() {
     let part = 0
     let activeClef = clef
     if (layout === 'grand') {
-      part = Math.abs(localY - 68) < Math.abs(localY) ? 1 : 0
+      part = Math.abs(localY - STAFF_GROUP_GAP) < Math.abs(localY) ? 1 : 0
       activeClef = part === 0 ? 'treble' : 'bass'
     } else if (layout === 'orchestra') {
-      part = Math.max(0, Math.min(stavesPerSystem - 1, Math.round(localY / 68)))
+      part = Math.max(0, Math.min(stavesPerSystem - 1, Math.round(localY / STAFF_GROUP_GAP)))
       activeClef = part === 0 ? 'treble' : 'bass'
     }
     const staffIndex = part
-    const staffY = baseY + part * 68
+    const staffY = baseY + part * STAFF_GROUP_GAP
     const bottom = CLEF_BOTTOM_NOTE[activeClef]
     // One diatonic step is exactly half the distance between staff lines.
     const step = Math.round((staffY + STAFF_HEIGHT - y) / (STAFF_SPACING / 2))
@@ -308,9 +330,9 @@ function App() {
     const name = DIATONIC[((pitchIndex % 7) + 7) % 7]
     const octave = bottom.octave + Math.floor(pitchIndex / 7)
     const key = name + '/' + octave
-    const measureWidth = (viewBox.width - 84) / 4
-    const measure = Math.max(0, Math.min(3, Math.floor((x - 42) / measureWidth)))
-    const measureIndex = system * 4 + measure
+    const measureWidth = (viewBox.width - SCORE_MARGIN * 2) / MEASURES_PER_SYSTEM
+    const measure = Math.max(0, Math.min(MEASURES_PER_SYSTEM - 1, Math.floor((x - SCORE_MARGIN) / measureWidth)))
+    const measureIndex = system * MEASURES_PER_SYSTEM + measure
     const current = grouped.get(staffIndex + ':' + measureIndex) || []
     const beatLimit = ((Number(time.split('/')[0]) || 4) * 4) / (Number(time.split('/')[1]) || 4)
     const used = current.reduce((sum, n) => sum + BEATS[n.duration] * (n.dotted ? 1.5 : 1), 0)
@@ -405,9 +427,10 @@ function App() {
           <button className={activeTool === 'score' ? 'tool-icon active' : 'tool-icon'} aria-label="Khóa, nhịp và hóa biểu" title="Khóa, nhịp và hóa biểu" onClick={() => setActiveTool(activeTool === 'score' ? null : 'score')}><span>𝄞</span></button>
           <button className={activeTool === 'playback' ? 'tool-icon active' : 'tool-icon'} aria-label="Thiết lập phát nhạc" title="Thiết lập phát nhạc" onClick={() => setActiveTool(activeTool === 'playback' ? null : 'playback')}><span>♫</span></button>
           <button className={activeTool === 'edit' ? 'tool-icon active' : 'tool-icon'} aria-label="Chỉnh sửa" title="Chỉnh sửa" onClick={() => setActiveTool(activeTool === 'edit' ? null : 'edit')}><span>↶</span></button>
+          <button className={activeTool === 'write' ? 'tool-icon active handwriting-tool' : 'tool-icon handwriting-tool'} aria-label="Viết tay và nhận dạng" title="Viết tay và nhận dạng" onClick={() => setActiveTool(activeTool === 'write' ? null : 'write')}><span>✍</span></button>
         </nav>
         {activeTool && <section className="tool-popover" aria-label="Bảng công cụ">
-          <div className="tool-popover-head"><strong>{({ file: 'Tác phẩm', layout: 'Bố cục khuông', notes: 'Nốt và ký hiệu', score: 'Thiết lập bản nhạc', playback: 'Phát nhạc', edit: 'Chỉnh sửa' } as const)[activeTool]}</strong><button className="popover-close" aria-label="Đóng bảng công cụ" onClick={() => setActiveTool(null)}>×</button></div>
+          <div className="tool-popover-head"><strong>{({ file: 'Tác phẩm', layout: 'Bố cục khuông', notes: 'Nốt và ký hiệu', score: 'Thiết lập bản nhạc', playback: 'Phát nhạc', edit: 'Chỉnh sửa', write: 'Viết tay và nhận dạng' } as const)[activeTool]}</strong><button className="popover-close" aria-label="Đóng bảng công cụ" onClick={() => setActiveTool(null)}>×</button></div>
           {activeTool === 'file' && <>
             <label className="field-label" htmlFor="score-title">Tên tác phẩm</label><input id="score-title" className="title-input" value={title} onChange={e => setTitle(e.target.value)} />
             <div className="tool-divider-line" />
@@ -436,11 +459,21 @@ function App() {
             <div className="setting-row"><label className="field-label" htmlFor="dynamic">Cường độ</label><select id="dynamic" value={dynamic} onChange={e => setDynamic(e.target.value)}>{['pp','p','mp','mf','f','ff'].map(v => <option key={v}>{v}</option>)}</select></div>
             <p className="tool-help">Thiết lập tempo và cường độ hiển thị trên bản nhạc. Bộ phát âm thanh chưa được kết nối trong phiên bản này.</p>
           </>}
+          {activeTool === 'write' && <div className="handwriting-panel">
+            <p className="tool-help">Viết ký hiệu bằng Apple Pencil hoặc bút cảm ứng trong vùng bên dưới. Nét viết hiện được giữ trong phiên làm việc này.</p>
+            <canvas ref={handwritingCanvasRef} className="handwriting-canvas" width={720} height={260}
+              onPointerDown={event => { const canvas = event.currentTarget; const rect = canvas.getBoundingClientRect(); const x = (event.clientX - rect.left) * canvas.width / rect.width; const y = (event.clientY - rect.top) * canvas.height / rect.height; const ctx = canvas.getContext('2d'); if (!ctx) return; inkPointerRef.current = event.pointerId; canvas.setPointerCapture(event.pointerId); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#29251f' }}
+              onPointerMove={event => { if (inkPointerRef.current !== event.pointerId) return; const canvas = event.currentTarget; const rect = canvas.getBoundingClientRect(); const x = (event.clientX - rect.left) * canvas.width / rect.width; const y = (event.clientY - rect.top) * canvas.height / rect.height; const ctx = canvas.getContext('2d'); if (!ctx) return; ctx.lineTo(x, y); ctx.stroke() }}
+              onPointerUp={event => { if (inkPointerRef.current === event.pointerId) inkPointerRef.current = null }}
+              onPointerCancel={event => { if (inkPointerRef.current === event.pointerId) inkPointerRef.current = null }} />
+            <button className="tool-action" onClick={() => { const canvas = handwritingCanvasRef.current; canvas?.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height) }}><span>⌫</span>Xóa nét viết</button>
+            <p className="tool-help handwriting-notice">Bộ nhận dạng chữ viết nhạc của MeloLegacy chưa được kết nối. Nút này đã mở vùng viết tay; chưa tự chuyển nét viết thành MusicXML hoặc nốt nhạc.</p>
+          </div>}
           {activeTool === 'edit' && <div className="edit-tools"><button className="tool-action" onClick={undo} disabled={!history.length}><span>↶</span>Hoàn tác</button><button className="tool-action" onClick={redo} disabled={!future.length}><span>↷</span>Làm lại</button><button className="tool-action danger" onClick={clearScore}><span>⌫</span>Xóa bản nhạc</button><button className="tool-action" onClick={() => window.print()}><span>⤓</span>Xuất / In PDF</button></div>}
         </section>}
       </aside>
       <section className="score-area">
-        <div className="score-toolbar"><div><span className="crumb">MeloLegacy</span><span className="slash">/</span><b>Phòng Soạn Nhạc</b></div><div className="zoom-label">A4 · Dọc · {systems} hệ thống</div></div>
+        <div className="score-toolbar"><div><span className="crumb">MeloLegacy</span><span className="slash">/</span><b>Phòng Soạn Nhạc</b></div><div className="zoom-label">A4 · Dọc · {systems} hệ thống · 3 ô nhịp / hệ</div></div>
         <div className="paper-wrap"><div className="paper" style={{ minHeight: paperHeight }}>
           <div className="paper-head"><div className="paper-kicker">MELOLEGACY · MUSIC COMPOSITION</div><h1>{title || 'Tác phẩm mới'}</h1><div className="paper-meta"><span>Tác giả: __________________</span><span>♩ = {tempo}　{dynamic}</span></div></div>
           <div className="notation-host" ref={scoreRef} onClick={addFromCanvas} style={{ minHeight: paperHeight - 180 }} />
@@ -448,7 +481,7 @@ function App() {
         </div></div>
       </section>
     </section>
-    <footer className="mobile-note">Chọn trường độ rồi chạm vào khuông nhạc để ghi nốt. Xoay iPad ngang để có vùng làm việc rộng hơn.</footer></>}
+    <footer className="mobile-note">Chọn trường độ rồi chạm vào khuông nhạc để ghi nốt. Dùng nút ✍ để mở vùng viết tay. Xoay iPad ngang để có vùng làm việc rộng hơn.</footer></>}
   </main>
 }
 export default App
