@@ -105,3 +105,20 @@ test('Lyre placeholder is explicit and does not claim the original asset is pres
   await expect(page.getByText(/Đang chờ ảnh Lyre vàng kim gốc/)).toBeVisible()
   await expect(page.locator('.lyre-asset-required')).toBeVisible()
 })
+
+
+test('piano reading controls support slow playback and stop on iPad browsers', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('melo-composer-notes-v2', JSON.stringify([
+      { id: 91001, staff: 0, measure: 0, beat: 0, key: 'c/4', duration: 'q', dotted: false, accidental: '', rest: false },
+      { id: 91002, staff: 0, measure: 0, beat: 1, key: 'e/4', duration: 'q', dotted: false, accidental: '', rest: false },
+    ]))
+  })
+  await page.goto('/')
+  await expect(page.getByRole('button', { name: /Nghe piano & đọc nốt/ })).toBeEnabled()
+  await page.getByLabel('Tốc độ đọc').selectOption('0.75')
+  await expect(page.getByLabel('Tốc độ đọc')).toHaveValue('0.75')
+  await page.getByRole('button', { name: /Nghe piano & đọc nốt/ }).click()
+  await expect(page.getByRole('button', { name: /Dừng đọc/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Nghe piano & đọc nốt/ })).toBeVisible({ timeout: 5000 })
+})
