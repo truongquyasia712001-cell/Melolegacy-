@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Accidental, Beam, Formatter, Renderer, Stave, StaveNote, Voice } from 'vexflow'
 import './App.css'
+import { PianoSampleBank } from './PianoSampleBank'
+import { loadPianoSampleBank, midiFromPitch, playPianoSample, type PianoSample } from './pianoSamples'
 
 type Duration = 'w' | 'h' | 'q' | '8' | '16' | '32'
-type NoteItem = { id: number; staff: number; measure: number; key: string; duration: Duration; dotted: boolean; accidental: '' | '#' | 'b' | 'n'; rest: boolean }
+type NoteItem = { id: number; staff: number; measure: number; beat?: number; key: string; duration: Duration; dotted: boolean; accidental: '' | '#' | 'b' | 'n'; rest: boolean }
 type Layout = 'solo' | 'large' | 'grand' | 'orchestra'
 type ImportedScore = { notes: NoteItem[]; partCount: number; staffCount: number; title: string }
 function parseMusicXml(xml: string): ImportedScore {
@@ -23,7 +25,13 @@ function parseMusicXml(xml: string): ImportedScore {
     ))
     measures.forEach((measure, measureIndex) => {
       const divisions = Number(measure.querySelector('attributes > divisions')?.textContent || '1')
-      Array.from(measure.children).filter(el => el.tagName === 'note').forEach(note => {
+      let cursorBeat = 0
+      let lastStartBeat = 0
+      Array.from(measure.children).forEach(element => {
+        if (element.tagName === 'backup') { cursorBeat = Math.max(0, cursorBeat - Number(element.querySelector('duration')?.textContent || 0) / divisions); return }
+        if (element.tagName === 'forward') { cursorBeat += Number(element.querySelector('duration')?.textContent || 0) / divisions; return }
+        if (element.tagName !== 'note') return
+        const note = element
         const pitch = note.querySelector('pitch')
         const rest = !!note.querySelector('rest')
         const step = (pitch?.querySelector('step')?.textContent || 'C').toLowerCase()
@@ -31,11 +39,14 @@ function parseMusicXml(xml: string): ImportedScore {
         const alter = Number(pitch?.querySelector('alter')?.textContent || '0')
         const accidentalNode = note.querySelector('accidental')?.textContent || ''
         const accidental: NoteItem['accidental'] = accidentalNode === 'sharp' || alter > 0 ? '#' : accidentalNode === 'flat' || alter < 0 ? 'b' : accidentalNode === 'natural' ? 'n' : ''
-        const quarterLength = Number(note.querySelector('duration')?.textContent || divisions) / divisions
+        const rawDuration = Number(note.querySelector('duration')?.textContent || divisions)
+        const quarterLength = rawDuration / divisions
         const duration = durationMap.reduce((best, item) => Math.abs(item[0] - quarterLength) < Math.abs(best[0] - quarterLength) ? item : best, durationMap[2])[1]
         const dotted = !!note.querySelector('dot')
         const localStaff = Math.max(0, Number(note.querySelector('staff')?.textContent || '1') - 1)
-        notes.push({ id: id++, staff: staffOffset + localStaff, measure: measureIndex, key: step + '/' + octave, duration, dotted, accidental, rest })
+        const startBeat = note.querySelector('chord') ? lastStartBeat : cursorBeat
+        notes.push({ id: id++, staff: staffOffset + localStaff, measure: measureIndex, beat: startBeat, key: step + '/' + octave, duration, dotted, accidental, rest })
+        if (!note.querySelector('chord')) { lastStartBeat = startBeat; cursorBeat += quarterLength }
       })
     })
     staffOffset += detectedStaffCount
@@ -43,6 +54,8 @@ function parseMusicXml(xml: string): ImportedScore {
   const title = doc.querySelector('work > work-title')?.textContent || doc.querySelector('movement-title')?.textContent || 'Bản nhạc vừa nhận dạng'
   return { notes, partCount: parts.length, staffCount: staffOffset, title }
 }
+const MeloEcosystem3D = lazy(() => import('./MeloEcosystem3D').then(module => ({ default: module.MeloEcosystem3D })))
+
 const DURATIONS: { value: Duration; label: string; glyph: string }[] = [
   { value: 'w', label: 'Tròn', glyph: '𝅝' }, { value: 'h', label: 'Trắng', glyph: '𝅗𝅥' },
   { value: 'q', label: 'Đen', glyph: '♩' }, { value: '8', label: 'Móc đơn', glyph: '♪' },
@@ -70,6 +83,7 @@ function makeVexNote(item: NoteItem, clef: string) {
 
 function App() {
   const [layout, setLayout] = useState<Layout>('solo')
+  const [showEcosystemMap, setShowEcosystemMap] = useState(false)
   const [duration, setDuration] = useState<Duration>('q')
   const [dotted, setDotted] = useState(false)
   const [rest, setRest] = useState(false)
@@ -86,6 +100,13 @@ function App() {
   const [status, setStatus] = useState('Đã lưu trên thiết bị')
   const [dynamic, setDynamic] = useState('mf')
   const [tempo, setTempo] = useState(80)
+  const [playbackRate, setPlaybackRate] = useState(1)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [activeNoteIds, setActiveNoteIds] = useState<number[]>([])
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const playbackRunRef = useRef(0)
+  const pianoSamplesRef = useRef<PianoSample[]>([])
+  const [pianoSampleCount, setPianoSampleCount] = useState(0)
   const [omrBusy, setOmrBusy] = useState(false)
   const [omrMessage, setOmrMessage] = useState('Chọn tệp PDF để nhận dạng bản nhạc.')
   const [omrJobId, setOmrJobId] = useState('')
@@ -99,6 +120,10 @@ function App() {
   const stavesPerSystem = layout === 'grand' ? 2 : layout === 'orchestra' ? (importedStaffCount ?? 4) : 1
   const systemGap = layout === 'grand' ? GRAND_GAP : layout === 'orchestra' ? Math.max(SYSTEM_GAP, (stavesPerSystem - 1) * 68 + STAFF_HEIGHT + 30) : SYSTEM_GAP
   const paperHeight = Math.max(1123, 190 + systems * systemGap)
+
+  useEffect(() => {
+    loadPianoSampleBank().then(samples => { pianoSamplesRef.current = samples; setPianoSampleCount(samples.length) }).catch(error => console.warn('Piano sample bank unavailable', error))
+  }, [])
 
   useEffect(() => {
     localStorage.setItem('melo-composer-notes-v2', JSON.stringify(notes))
@@ -154,6 +179,10 @@ function App() {
             voice.addTickables(tickables)
             new Formatter().joinVoices([voice]).format([voice], measureWidth - 58)
             voice.draw(context, stave)
+            tickables.forEach((tickable, index) => {
+              const element = tickable.getSVGElement()
+              if (element) element.setAttribute('data-note-id', String(items[index].id))
+            })
             const beams = Beam.generateBeams(tickables)
             beams.forEach(beam => beam.setContext(context).draw())
           }
@@ -166,6 +195,85 @@ function App() {
       setStatus('Có lỗi khi dàn trang ký âm')
     }
   }, [notes, layout, clef, time, keySig, systems, stavesPerSystem, paperHeight, grouped])
+
+  useEffect(() => {
+    const host = scoreRef.current
+    if (!host) return
+    host.querySelectorAll('[data-note-id]').forEach(element => {
+      const id = Number(element.getAttribute('data-note-id'))
+      element.classList.toggle('is-playing', activeNoteIds.includes(id))
+    })
+  }, [activeNoteIds, notes, layout])
+
+  function stopPlayback() {
+    playbackRunRef.current += 1
+    setIsPlaying(false)
+    setActiveNoteIds([])
+  }
+
+  function playPianoTone(key: string, accidentalValue: NoteItem['accidental'], seconds: number) {
+    const AudioContextClass = window.AudioContext
+    if (!AudioContextClass) return
+    const context = audioContextRef.current || (audioContextRef.current = new AudioContextClass())
+    const midi = midiFromPitch(key, accidentalValue)
+    const nearestSample = pianoSamplesRef.current.reduce<PianoSample | null>((best, sample) =>
+      !best || Math.abs(sample.midi - midi) < Math.abs(best.midi - midi) ? sample : best, null)
+    if (nearestSample && Math.abs(nearestSample.midi - midi) <= 12) {
+      playPianoSample(context, nearestSample, midi, seconds)
+      return
+    }
+    const frequency = 440 * Math.pow(2, (midi - 69) / 12)
+    const master = context.createGain()
+    master.gain.setValueAtTime(0.0001, context.currentTime)
+    master.gain.exponentialRampToValueAtTime(0.16, context.currentTime + 0.012)
+    master.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + Math.max(0.08, seconds))
+    master.connect(context.destination)
+    ;[1, 2, 3, 4].forEach((partial, index) => {
+      const oscillator = context.createOscillator()
+      const partialGain = context.createGain()
+      oscillator.type = 'sine'
+      oscillator.frequency.setValueAtTime(frequency * partial, context.currentTime)
+      partialGain.gain.value = [1, 0.32, 0.12, 0.045][index]
+      oscillator.connect(partialGain)
+      partialGain.connect(master)
+      oscillator.start()
+      oscillator.stop(context.currentTime + Math.max(0.1, seconds) + 0.03)
+    })
+  }
+
+  async function togglePlayback() {
+    if (isPlaying) { stopPlayback(); return }
+    if (!notes.length) { setStatus('Chưa có nốt nhạc để phát'); return }
+    const run = ++playbackRunRef.current
+    const context = audioContextRef.current || (audioContextRef.current = new AudioContext())
+    await context.resume()
+    setIsPlaying(true)
+    const beatSeconds = 60 / Math.max(20, Math.min(300, tempo)) / playbackRate
+    const measureBeats = ((Number(time.split('/')[0]) || 4) * 4) / (Number(time.split('/')[1]) || 4)
+    const fallbackBeat = new Map<string, number>()
+    const events = notes.map(note => {
+      const group = note.staff + ':' + note.measure
+      const beat = Number.isFinite(note.beat) ? Number(note.beat) : (fallbackBeat.get(group) || 0)
+      if (!Number.isFinite(note.beat)) fallbackBeat.set(group, beat + BEATS[note.duration] * (note.dotted ? 1.5 : 1))
+      return { note, at: note.measure * measureBeats + beat, length: BEATS[note.duration] * (note.dotted ? 1.5 : 1) }
+    }).sort((a, b) => a.at - b.at || a.note.staff - b.note.staff || a.note.id - b.note.id)
+    let index = 0
+    let currentBeat = events[0]?.at ?? 0
+    while (index < events.length && playbackRunRef.current === run) {
+      const simultaneous = events.filter(event => Math.abs(event.at - currentBeat) < 0.0001)
+      const groupIds = simultaneous.map(event => event.note.id)
+      setActiveNoteIds(groupIds)
+      simultaneous.forEach(({ note, length }) => {
+        if (!note.rest) playPianoTone(note.key, note.accidental, Math.max(0.07, length * beatSeconds * 0.88))
+      })
+      index += simultaneous.length
+      const nextBeat = events[index]?.at
+      const waitBeats = nextBeat === undefined ? Math.max(0.25, ...simultaneous.map(event => event.length)) : Math.max(0.04, nextBeat - currentBeat)
+      await new Promise(resolve => window.setTimeout(resolve, waitBeats * beatSeconds * 1000))
+      currentBeat = nextBeat ?? currentBeat + waitBeats
+    }
+    if (playbackRunRef.current === run) { setIsPlaying(false); setActiveNoteIds([]) }
+  }
 
   function commit(next: NoteItem[]) {
     setHistory(prev => [...prev, notes])
@@ -216,7 +324,7 @@ function App() {
       setStatus('Ô nhịp đã đủ trường độ. Hãy chọn ô nhịp kế tiếp.')
       return
     }
-    const item: NoteItem = { id: Date.now() + Math.random(), staff: staffIndex, measure: measureIndex, key, duration, dotted, accidental, rest }
+    const item: NoteItem = { id: Date.now() + Math.random(), staff: staffIndex, measure: measureIndex, beat: used, key, duration, dotted, accidental, rest }
     commit([...notes, item])
     setStatus('Đã thêm ký hiệu vào ô nhịp')
   }
@@ -289,10 +397,10 @@ function App() {
 
   return <main className="app-shell">
     <header className="topbar">
-      <div className="brand"><div className="brand-mark">M</div><div><strong>MeloLegacy</strong><span>PHÒNG SOẠN NHẠC</span></div></div>
-      <div className="top-actions"><span className="save-state"><i />{status}</span><button className="gold-button" onClick={() => window.print()}>Xuất PDF</button></div>
+      <div className="brand"><div className="brand-mark">M</div><div><strong>MeloLegacy</strong><span>{showEcosystemMap ? 'BẢN ĐỒ HỆ SINH THÁI' : 'PHÒNG SOẠN NHẠC'}</span></div></div>
+      <div className="top-actions"><button className="map-toggle-button" onClick={() => setShowEcosystemMap(value => !value)}>{showEcosystemMap ? 'Phòng Soạn Nhạc' : 'Bản đồ Melo'}</button><span className="save-state"><i />{status}</span><button className="gold-button" onClick={() => window.print()}>Xuất PDF</button></div>
     </header>
-    <section className="workspace">
+    {showEcosystemMap ? <Suspense fallback={<div className="melo-map-loading">Đang mở sơ đồ 3D…</div>}><MeloEcosystem3D onClose={() => setShowEcosystemMap(false)} /></Suspense> : <><section className="workspace">
       <aside className="tool-panel">
         <div className="panel-heading">TÁC PHẨM</div>
         <label className="field-label" htmlFor="score-title">Tên tác phẩm</label>
@@ -317,6 +425,10 @@ function App() {
         <div className="setting-row"><label className="field-label" htmlFor="key">Hóa biểu</label><select id="key" value={keySig} onChange={e => setKeySig(e.target.value)}>{['C','G','D','A','E','B','F','Bb','Eb','Ab','Db','Gb'].map(k => <option key={k}>{k}</option>)}</select></div>
         <div className="panel-heading">ÂM NHẠC · PHÁT LẠI</div>
         <div className="setting-row"><label className="field-label" htmlFor="tempo">Tempo ♩</label><input id="tempo" type="number" min="20" max="300" value={tempo} onChange={e => setTempo(Number(e.target.value))}/></div>
+        <div className="setting-row"><label className="field-label" htmlFor="playback-rate">Tốc độ đọc</label><select id="playback-rate" value={playbackRate} onChange={e => setPlaybackRate(Number(e.target.value))}><option value={0.5}>0,5× · Rất chậm</option><option value={0.75}>0,75× · Chậm</option><option value={1}>1× · Chuẩn</option><option value={1.25}>1,25× · Nhanh</option><option value={1.5}>1,5× · Rất nhanh</option></select></div>
+        <button className="gold-button piano-play-button" onClick={togglePlayback} disabled={!notes.length}>{isPlaying ? 'Ⅱ　Dừng đọc' : '▶　Nghe piano & đọc nốt'}</button>
+        <p className="hint">{pianoSampleCount ? 'Đang dùng ' + pianoSampleCount + ' mẫu piano từ thư viện đã nạp; nốt đang phát được lấy từ sample gần cao độ nhất.' : 'Chưa nạp thư viện sample; hiện dùng âm piano mô phỏng.'} Nốt đang phát sẽ được tô sáng.</p>
+        <PianoSampleBank onSaved={samples => { pianoSamplesRef.current = samples; setPianoSampleCount(samples.length) }} />
         <div className="setting-row"><label className="field-label" htmlFor="dynamic">Cường độ</label><select id="dynamic" value={dynamic} onChange={e => setDynamic(e.target.value)}>{['pp','p','mp','mf','f','ff'].map(v => <option key={v}>{v}</option>)}</select></div>
         <div className="action-stack"><button onClick={undo} disabled={!history.length}>↶　Hoàn tác</button><button onClick={redo} disabled={!future.length}>↷　Làm lại</button><button onClick={clearScore}>⌫　Xóa bản nhạc</button></div>
         <p className="hint">Chọn trường độ và chạm đúng vị trí trên khuông để ghi nốt. Các nốt được khắc bằng bộ máy ký âm VexFlow.</p>
@@ -336,7 +448,7 @@ function App() {
         </div></div>
       </section>
     </section>
-    <footer className="mobile-note">Chọn trường độ rồi chạm vào khuông nhạc để ghi nốt. Xoay iPad ngang để có vùng làm việc rộng hơn.</footer>
+    <footer className="mobile-note">Chọn trường độ rồi chạm vào khuông nhạc để ghi nốt. Xoay iPad ngang để có vùng làm việc rộng hơn.</footer></>}
   </main>
 }
 export default App

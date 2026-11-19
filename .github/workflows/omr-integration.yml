@@ -2,9 +2,9 @@ name: Validate MeloLegacy PDF OMR integration
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feature/audiveris-omr-pdf]
   push:
-    branches: [feature/audiveris-omr-pdf]
+    branches: [feature/audiveris-omr-pdf, feature/melolegacy-3d-ecosystem-map, feature/omr-piano-reading-playback]
 
 jobs:
   web-build:
@@ -41,6 +41,37 @@ jobs:
           cat /tmp/omr-health.json
           grep -q '"engine_available":"true"' /tmp/omr-health.json
           docker exec melolegacy-omr-ci /opt/audiveris/bin/Audiveris -help
+      - name: Generate a synthetic sheet-music PDF fixture
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lilypond
+          lilypond -o /tmp/melolegacy-omr-fixture melolegacy/omr-service/tests/generate_fixture.ly
+          test -s /tmp/melolegacy-omr-fixture.pdf
+      - name: Run PDF through Audiveris and assert MusicXML output
+        run: |
+          curl -fsS -F "pdf=@/tmp/melolegacy-omr-fixture.pdf" http://localhost:8080/v1/jobs > /tmp/omr-job.json
+          JOB_ID=$(python3 -c "import json; print(json.load(open('/tmp/omr-job.json'))['id'])")
+          echo "OMR job: $JOB_ID"
+          for attempt in {1..180}; do
+            curl -fsS "http://localhost:8080/v1/jobs/$JOB_ID" > /tmp/omr-status.json
+            STATUS=$(python3 -c "import json; print(json.load(open('/tmp/omr-status.json'))['status'])")
+            if [ "$STATUS" = "completed" ]; then break; fi
+            if [ "$STATUS" = "failed" ]; then
+              cat /tmp/omr-status.json
+              exit 1
+            fi
+            sleep 2
+          done
+          test "$STATUS" = "completed"
+          curl -fsS "http://localhost:8080/v1/jobs/$JOB_ID/musicxml" > /tmp/omr-result.musicxml
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          root = ET.parse('/tmp/omr-result.musicxml').getroot()
+          notes = [node for node in root.iter() if node.tag.endswith('note')]
+          if len(notes) < 3:
+              raise SystemExit(f'Expected at least 3 recognized notes, found {len(notes)}')
+          print(f'OMR smoke test passed: {len(notes)} MusicXML notes exported.')
+          PY
       - name: Stop OMR service
         if: always()
         run: docker rm -f melolegacy-omr-ci || true
