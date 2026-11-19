@@ -63,7 +63,6 @@ export default function App() {
     const target = event.target as Element
     const svg = target.closest('svg')
     if (!svg || !target.closest('.notation-host')) return false
-    const rect = svg.getBoundingClientRect()
     const x = event.clientX
     const y = event.clientY
     const clefHit = target.closest('[class*="clef"]')
