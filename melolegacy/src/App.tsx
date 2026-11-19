@@ -66,7 +66,6 @@ export default function App() {
     const rect = svg.getBoundingClientRect()
     const x = event.clientX
     const y = event.clientY
-    const localX = (x - rect.left) * (svg.viewBox.baseVal.width / rect.width)
     const clefHit = target.closest('[class*="clef"]')
     const timeHit = target.closest('[class*="timesig"], [class*="time-signature"]')
     const keyHit = target.closest('[class*="keysig"], [class*="key-signature"]')
