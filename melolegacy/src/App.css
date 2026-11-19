@@ -40,3 +40,7 @@
 .handwriting-notice{padding:9px 10px;border-left:2px solid #c7a66a;background:#faf6ed;color:#786747}
 .handwriting-panel{display:grid;gap:9px}
 @media(max-width:760px){.tool-icon-list{gap:4px}.tool-icon{width:39px;height:39px;font-size:20px}.handwriting-canvas{height:180px}}
+
+/* SMuFL Bravura music-font glyphs in the duration palette */
+.duration span{font-family:'Bravura',serif;font-size:27px;line-height:30px;font-variant-ligatures:none}
+.accidental-grid .mini-tool{font-family:'Bravura',Inter,sans-serif}
