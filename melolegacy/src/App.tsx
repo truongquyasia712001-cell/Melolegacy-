@@ -258,7 +258,7 @@ function App() {
           const activeClef = layout === 'grand' ? (part === 0 ? 'treble' : 'bass') : (layout === 'orchestra' && part > 0 ? 'bass' : clef)
           for (let bar = 0; bar < MEASURES_PER_SYSTEM; bar++) {
             const x = margin + bar * measureWidth
-            const stave = new Stave(x, y, measureWidth - measureGap, { spacing_between_lines_px: STAFF_SPACING })
+            const stave = new Stave(x, y, measureWidth - measureGap, { spacingBetweenLinesPx: STAFF_SPACING })
             if (bar === 0) {
               stave.addClef(activeClef)
               stave.addTimeSignature(time)
