@@ -84,7 +84,16 @@ function App() {
   const [showEcosystemMap, setShowEcosystemMap] = useState(false)
   const [activeTool, setActiveTool] = useState<'file' | 'layout' | 'notes' | 'score' | 'playback' | 'edit' | 'write' | null>(null)
   const [duration, setDuration] = useState<Duration>('q')
-  const [handwritingStrokes, setHandwritingStrokes] = useState<InkStroke[]>([])
+  const [handwritingStrokes, setHandwritingStrokes] = useState<InkStroke[]>(() => {
+    try {
+      const stored = localStorage.getItem('melo-handwriting-strokes-v1')
+      if (!stored) return []
+      const parsed: unknown = JSON.parse(stored)
+      return Array.isArray(parsed) ? parsed as InkStroke[] : []
+    } catch {
+      return []
+    }
+  })
   const [dotted, setDotted] = useState(false)
   const [rest, setRest] = useState(false)
   const [accidental, setAccidental] = useState<NoteItem['accidental']>('')
@@ -242,6 +251,14 @@ function App() {
     })
     return result
   }, [notes])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('melo-handwriting-strokes-v1', JSON.stringify(handwritingStrokes))
+    } catch {
+      setStatus('Không thể lưu nét viết vào bộ nhớ trên thiết bị')
+    }
+  }, [handwritingStrokes])
 
   useEffect(() => {
     const canvas = handwritingCanvasRef.current
