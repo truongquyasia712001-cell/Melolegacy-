@@ -43,9 +43,10 @@ jobs:
           docker exec melolegacy-omr-ci /opt/audiveris/bin/Audiveris -help
       - name: Generate a synthetic sheet-music PDF fixture
         run: |
-          python3 -m venv /tmp/omr-test-venv
-          /tmp/omr-test-venv/bin/pip install --quiet reportlab
-          /tmp/omr-test-venv/bin/python melolegacy/omr-service/tests/generate_fixture.py /tmp/melolegacy-omr-fixture.pdf
+          sudo apt-get update
+          sudo apt-get install -y lilypond
+          lilypond -o /tmp/melolegacy-omr-fixture melolegacy/omr-service/tests/generate_fixture.ly
+          test -s /tmp/melolegacy-omr-fixture.pdf
       - name: Run PDF through Audiveris and assert MusicXML output
         run: |
           curl -fsS -F "pdf=@/tmp/melolegacy-omr-fixture.pdf" http://localhost:8080/v1/jobs > /tmp/omr-job.json
