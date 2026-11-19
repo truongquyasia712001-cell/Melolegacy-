@@ -69,7 +69,8 @@ const CLEF_BOTTOM_NOTE: Record<string, { index: number; octave: number }> = {
 
 function makeVexNote(item: NoteItem, clef: string) {
   const duration = item.duration + (item.dotted ? 'd' : '') + (item.rest ? 'r' : '')
-  const note = new StaveNote({ keys: [item.rest ? 'b/4' : item.key], duration, clef, glyphFontScale: 34 })
+  const noteOptions = { keys: [item.rest ? 'b/4' : item.key], duration, clef, glyph_font_scale: 34 } as ConstructorParameters<typeof StaveNote>[0]
+  const note = new StaveNote(noteOptions)
   if (item.accidental && !item.rest) note.addModifier(new Accidental(item.accidental), 0)
   return note
 }
