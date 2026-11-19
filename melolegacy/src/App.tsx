@@ -78,7 +78,7 @@ export default function App() {
     return true
   }
 
-  function openClef(event: React.MouseEvent) { locate(event, 'clef') }
+  function openClef(event: React.MouseEvent) { return locate(event, 'clef') }
   function openInlineSetting(event: React.MouseEvent) {
     if (locate(event, 'time')) return
     locate(event, 'key')
@@ -124,7 +124,7 @@ export default function App() {
   return <div className="composer-interaction-shell"
     onClickCapture={event => { if (!penMode) openInlineSetting(event) }}
     onDoubleClickCapture={event => { if (!penMode) openClef(event) }}
-    onContextMenuCapture={event => { if (!penMode) { event.preventDefault(); openClef(event) } }}
+    onContextMenuCapture={event => { if (!penMode && openClef(event)) event.preventDefault() }}
     onTouchStartCapture={onLongPressStart}
     onTouchEndCapture={cancelLongPress}
     onTouchMoveCapture={cancelLongPress}>
