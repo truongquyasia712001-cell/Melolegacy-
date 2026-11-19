@@ -58,8 +58,8 @@ const BEATS: Record<Duration, number> = { w: 4, h: 2, q: 1, '8': .5, '16': .25, 
 const SYSTEM_TOP = 82
 const SYSTEM_GAP = 102
 const GRAND_GAP = 102
-const STAFF_GROUP_GAP = 28
-const STAFF_SPACING = 4
+const STAFF_GROUP_GAP = 34
+const STAFF_SPACING = 6
 const STAFF_LINE_COUNT = 5
 const STAFF_HEIGHT = (STAFF_LINE_COUNT - 1) * STAFF_SPACING
 const MEASURES_PER_SYSTEM = 5
@@ -73,7 +73,7 @@ const CLEF_BOTTOM_NOTE: Record<string, { index: number; octave: number }> = {
 
 function makeVexNote(item: NoteItem, clef: string) {
   const duration = item.duration + (item.dotted ? 'd' : '') + (item.rest ? 'r' : '')
-  const noteOptions = { keys: [item.rest ? 'b/4' : item.key], duration, clef, glyph_font_scale: 34 } as ConstructorParameters<typeof StaveNote>[0]
+  const noteOptions = { keys: [item.rest ? 'b/4' : item.key], duration, clef, glyph_font_scale: 26 } as ConstructorParameters<typeof StaveNote>[0]
   const note = new StaveNote(noteOptions)
   if (item.accidental && !item.rest) note.addModifier(new Accidental(item.accidental), 0)
   return note
@@ -118,7 +118,7 @@ function App() {
   const systems = Math.max(baseSystems, Math.ceil(measureCount / MEASURES_PER_SYSTEM))
   const stavesPerSystem = layout === 'grand' ? 2 : layout === 'orchestra' ? (importedStaffCount ?? 4) : 1
   const systemGap = layout === 'grand' ? GRAND_GAP : layout === 'orchestra' ? Math.max(SYSTEM_GAP, (stavesPerSystem - 1) * STAFF_GROUP_GAP + STAFF_HEIGHT + 26) : SYSTEM_GAP
-  const paperHeight = Math.max(1123, 190 + systems * systemGap)
+  const paperHeight = Math.max(1123, 190 + (systems - 1) * systemGap)
 
   useEffect(() => {
     let active = true
