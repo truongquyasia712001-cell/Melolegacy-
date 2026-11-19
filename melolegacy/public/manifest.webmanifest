@@ -1,8 +1,8 @@
 {
   "id": "/",
   "name": "MeloLegacy – Phòng Soạn Nhạc",
-  "short_name": "MeloLegacy",
-  "description": "Không gian soạn nhạc của MeloLegacy",
+  "short_name": "Soạn Nhạc",
+  "description": "Mở trực tiếp Phòng Soạn Nhạc MeloLegacy trên iPad và điện thoại.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -1,240 +1,193 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Accidental, Beam, Formatter, Renderer, Stave, StaveNote, Voice } from 'vexflow'
-import './App.css'
+import { useEffect, useRef, useState } from 'react'
+import ComposerRoomBase from './ComposerRoomBase'
 
-type Duration = 'w' | 'h' | 'q' | '8' | '16' | '32'
-type NoteItem = { id: number; staff: number; measure: number; key: string; duration: Duration; dotted: boolean; accidental: '' | '#' | 'b' | 'n'; rest: boolean }
-type Layout = 'solo' | 'large' | 'grand' | 'orchestra'
-const DURATIONS: { value: Duration; label: string; glyph: string }[] = [
-  { value: 'w', label: 'Tròn', glyph: '𝅝' }, { value: 'h', label: 'Trắng', glyph: '𝅗𝅥' },
-  { value: 'q', label: 'Đen', glyph: '♩' }, { value: '8', label: 'Móc đơn', glyph: '♪' },
-  { value: '16', label: 'Móc kép', glyph: '𝅘𝅥𝅯' }, { value: '32', label: 'Móc ba', glyph: '𝅘𝅥𝅰' },
+type Popup = { kind: 'clef' | 'key' | 'time'; x: number; y: number } | null
+const CLEFS = [
+  { value: 'treble', label: 'Sol', symbol: '𝄞' },
+  { value: 'bass', label: 'Fa', symbol: '𝄢' },
+  { value: 'alto', label: 'Đô Alto', symbol: '𝄡' },
+  { value: 'tenor', label: 'Đô Tenor', symbol: '𝄡' },
 ]
-const DIATONIC = ['c', 'd', 'e', 'f', 'g', 'a', 'b']
-const BEATS: Record<Duration, number> = { w: 4, h: 2, q: 1, '8': .5, '16': .25, '32': .125 }
-const SYSTEM_TOP = 94
-const SYSTEM_GAP = 96
-const GRAND_GAP = 142
-const STAFF_SPACING = 9
-const STAFF_LINE_COUNT = 5
-const STAFF_HEIGHT = (STAFF_LINE_COUNT - 1) * STAFF_SPACING
-const CLEF_BOTTOM_NOTE: Record<string, { index: number; octave: number }> = {
-  treble: { index: 2, octave: 4 }, bass: { index: 6, octave: 2 },
-  alto: { index: 5, octave: 3 }, tenor: { index: 1, octave: 3 },
+const FIFTHS = ['C', 'G', 'D', 'A', 'E', 'B', 'Gb', 'Db', 'Ab', 'Eb', 'Bb', 'F']
+const KEY_LABELS: Record<string, string> = { C: 'Đô', G: 'Sol', D: 'Rê', A: 'La', E: 'Mi', B: 'Si', Gb: 'Sol♭', Db: 'Rê♭', Ab: 'La♭', Eb: 'Mi♭', Bb: 'Si♭', F: 'Fa' }
+
+function setNativeSelect(id: string, value: string) {
+  const select = document.getElementById(id) as HTMLSelectElement | null
+  if (!select) return
+  const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set
+  setter?.call(select, value)
+  select.dispatchEvent(new Event('change', { bubbles: true }))
 }
 
-function makeVexNote(item: NoteItem, clef: string) {
-  const duration = item.duration + (item.dotted ? 'd' : '') + (item.rest ? 'r' : '')
-  const note = new StaveNote({ keys: [item.rest ? 'b/4' : item.key], duration, clef })
-  if (item.accidental && !item.rest) note.addModifier(new Accidental(item.accidental), 0)
-  return note
-}
-
-function App() {
-  const [layout, setLayout] = useState<Layout>('solo')
-  const [duration, setDuration] = useState<Duration>('q')
-  const [dotted, setDotted] = useState(false)
-  const [rest, setRest] = useState(false)
-  const [accidental, setAccidental] = useState<NoteItem['accidental']>('')
-  const [clef, setClef] = useState<'treble' | 'bass' | 'alto' | 'tenor'>('treble')
-  const [time, setTime] = useState('4/4')
-  const [keySig, setKeySig] = useState('C')
-  const [title, setTitle] = useState('Tác phẩm mới')
-  const [notes, setNotes] = useState<NoteItem[]>(() => {
-    try { return JSON.parse(localStorage.getItem('melo-composer-notes-v2') || '[]') as NoteItem[] } catch { return [] }
-  })
-  const [history, setHistory] = useState<NoteItem[][]>([])
-  const [future, setFuture] = useState<NoteItem[][]>([])
-  const [status, setStatus] = useState('Đã lưu trên thiết bị')
-  const [dynamic, setDynamic] = useState('mf')
-  const [tempo, setTempo] = useState(80)
-  const scoreRef = useRef<HTMLDivElement>(null)
-
-  const systems = layout === 'solo' ? 10 : layout === 'large' ? 6 : layout === 'grand' ? 5 : 5
-  const stavesPerSystem = layout === 'grand' ? 2 : layout === 'orchestra' ? 4 : 1
-  const paperHeight = Math.max(1123, 190 + systems * (layout === 'grand' ? GRAND_GAP : SYSTEM_GAP))
+export default function App() {
+  const [popup, setPopup] = useState<Popup>(null)
+  const [penMode, setPenMode] = useState(false)
+  const [strokes, setStrokes] = useState<string[]>([])
+  const [activeStroke, setActiveStroke] = useState('')
+  const [timeTop, setTimeTop] = useState(4)
+  const [timeBottom, setTimeBottom] = useState(4)
+  const [wheelRotation, setWheelRotation] = useState(0)
+  const wheelDragRef = useRef<{ startAngle: number; startRotation: number; moved: boolean } | null>(null)
+  const wheelSuppressClickRef = useRef(false)
+  const timerRef = useRef<number | null>(null)
 
   useEffect(() => {
-    localStorage.setItem('melo-composer-notes-v2', JSON.stringify(notes))
-    setStatus('Đã lưu trên thiết bị')
-  }, [notes])
-
-  const grouped = useMemo(() => {
-    const result = new Map<string, NoteItem[]>()
-    notes.forEach(note => {
-      const id = note.staff + ':' + note.measure
-      result.set(id, [...(result.get(id) || []), note])
-    })
-    return result
-  }, [notes])
+    const close = (event: PointerEvent) => {
+      if (!(event.target as HTMLElement)?.closest?.('.notation-picker, .notation-picker-trigger')) setPopup(null)
+    }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [])
 
   useEffect(() => {
-    const host = scoreRef.current
-    if (!host) return
-    host.innerHTML = ''
-    try {
-      const width = Math.max(320, host.clientWidth || 760)
-      const renderer = new Renderer(host, Renderer.Backends.SVG)
-      renderer.resize(width, paperHeight)
-      const context = renderer.getContext()
-      const margin = 42
-      const measureGap = 3
-      const measureWidth = (width - margin * 2) / 4
-      for (let system = 0; system < systems; system++) {
-        const baseY = SYSTEM_TOP + system * (layout === 'grand' ? GRAND_GAP : SYSTEM_GAP)
-        for (let part = 0; part < stavesPerSystem; part++) {
-          const staffIndex = system * stavesPerSystem + part
-          const y = baseY + part * 68
-          const activeClef = layout === 'grand' ? (part === 0 ? 'treble' : 'bass') : (layout === 'orchestra' && part > 0 ? 'bass' : clef)
-          for (let bar = 0; bar < 4; bar++) {
-            const x = margin + bar * measureWidth
-            const stave = new Stave(x, y, measureWidth - measureGap)
-            if (bar === 0) {
-              stave.addClef(activeClef)
-              stave.addTimeSignature(time)
-              if (keySig !== 'C') stave.addKeySignature(keySig)
-            }
-            stave.setContext(context).draw()
-            const items = grouped.get(staffIndex + ':' + bar) || []
-            if (!items.length) continue
-            const tickables = items.map(item => {
-              const note = makeVexNote(item, activeClef)
-              if (item.dotted) note.addModifier // VexFlow duration carries the dot
-              return note
-            })
-            const voice = new Voice({ numBeats: Number(time.split('/')[0]) || 4, beatValue: Number(time.split('/')[1]) || 4 })
-            voice.setMode(Voice.Mode.SOFT)
-            voice.addTickables(tickables)
-            new Formatter().joinVoices([voice]).format([voice], measureWidth - 58)
-            voice.draw(context, stave)
-            const beams = Beam.generateBeams(tickables)
-            beams.forEach(beam => beam.setContext(context).draw())
-          }
-        }
-      }
-      const svg = host.querySelector('svg')
-      if (svg) { svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', 'Bản nhạc được khắc ký âm bằng VexFlow') }
-    } catch (error) {
-      console.error('Music engraving error', error)
-      setStatus('Có lỗi khi dàn trang ký âm')
+    const layer = document.querySelector<HTMLElement>('.pen-layer')
+    const host = document.querySelector<HTMLElement>('.notation-host')
+    if (!layer || !host) return
+    const place = () => {
+      const rect = host.getBoundingClientRect()
+      layer.style.top = rect.top + 'px'
+      layer.style.left = rect.left + 'px'
+      layer.style.width = rect.width + 'px'
+      layer.style.height = rect.height + 'px'
     }
-  }, [notes, layout, clef, time, keySig, systems, stavesPerSystem, paperHeight, grouped])
-
-  function commit(next: NoteItem[]) {
-    setHistory(prev => [...prev, notes])
-    setFuture([])
-    setNotes(next)
-  }
-
-  function addFromCanvas(event: React.MouseEvent<HTMLDivElement>) {
-    const host = scoreRef.current
-    const svg = host?.querySelector('svg')
-    if (!host || !svg) return
-    // Convert the pointer through the rendered SVG's actual viewBox. This keeps
-    // note placement aligned after responsive scaling, zooming and scrolling.
-    const rect = svg.getBoundingClientRect()
-    const viewBox = svg.viewBox.baseVal
-    const scaleX = viewBox.width / rect.width
-    const x = (event.clientX - rect.left) * scaleX
-    const y = (event.clientY - rect.top) * (viewBox.height / rect.height)
-    const systemGap = layout === 'grand' ? GRAND_GAP : SYSTEM_GAP
-    const system = Math.round((y - SYSTEM_TOP) / systemGap)
-    if (system < 0 || system >= systems) return
-    const baseY = SYSTEM_TOP + system * systemGap
-    const localY = y - baseY
-    let part = 0
-    let activeClef = clef
-    if (layout === 'grand') {
-      part = Math.abs(localY - 68) < Math.abs(localY) ? 1 : 0
-      activeClef = part === 0 ? 'treble' : 'bass'
-    } else if (layout === 'orchestra') {
-      part = Math.max(0, Math.min(3, Math.round(localY / 68)))
-      activeClef = part === 0 ? 'treble' : 'bass'
+    place()
+    const observer = new ResizeObserver(place)
+    observer.observe(host)
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
     }
-    const staffIndex = system * stavesPerSystem + part
-    const staffY = baseY + part * 68
-    const bottom = CLEF_BOTTOM_NOTE[activeClef]
-    // One diatonic step is exactly half the distance between staff lines.
-    const step = Math.round((staffY + STAFF_HEIGHT - y) / (STAFF_SPACING / 2))
-    const pitchIndex = bottom.index + step
-    const name = DIATONIC[((pitchIndex % 7) + 7) % 7]
-    const octave = bottom.octave + Math.floor(pitchIndex / 7)
-    const key = name + '/' + octave
-    const measureWidth = (viewBox.width - 84) / 4
-    const measure = Math.max(0, Math.min(3, Math.floor((x - 42) / measureWidth)))
-    const current = grouped.get(staffIndex + ':' + measure) || []
-    const beatLimit = ((Number(time.split('/')[0]) || 4) * 4) / (Number(time.split('/')[1]) || 4)
-    const used = current.reduce((sum, n) => sum + BEATS[n.duration] * (n.dotted ? 1.5 : 1), 0)
-    if (used + BEATS[duration] * (dotted ? 1.5 : 1) > beatLimit + 0.001) {
-      setStatus('Ô nhịp đã đủ trường độ. Hãy chọn ô nhịp kế tiếp.')
-      return
-    }
-    const item: NoteItem = { id: Date.now() + Math.random(), staff: staffIndex, measure, key, duration, dotted, accidental, rest }
-    commit([...notes, item])
-    setStatus('Đã thêm ký hiệu vào ô nhịp')
+  }, [])
+
+  function locate(event: React.MouseEvent, kind: 'clef' | 'key' | 'time') {
+    const target = event.target as Element
+    const svg = target.closest('svg')
+    if (!svg || !target.closest('.notation-host')) return false
+    const x = event.clientX
+    const y = event.clientY
+    const clefHit = target.closest('[class*="clef"]')
+    const timeHit = target.closest('[class*="timesig"], [class*="time-signature"]')
+    const keyHit = target.closest('[class*="keysig"], [class*="key-signature"]')
+    const hit = kind === 'clef' ? clefHit : kind === 'time' ? timeHit : keyHit
+    if (!hit) return false
+    event.preventDefault()
+    event.stopPropagation()
+    setPopup({ kind, x: Math.min(window.innerWidth - 250, Math.max(8, x)), y: Math.min(window.innerHeight - 280, Math.max(8, y + 12)) })
+    return true
   }
 
-  function undo() {
-    if (!history.length) return
-    setFuture(prev => [notes, ...prev])
-    setNotes(history[history.length - 1])
-    setHistory(prev => prev.slice(0, -1))
+  function openClef(event: React.MouseEvent) { return locate(event, 'clef') }
+  function openInlineSetting(event: React.MouseEvent) {
+    if (locate(event, 'time')) return
+    locate(event, 'key')
   }
-  function redo() {
-    if (!future.length) return
-    setHistory(prev => [...prev, notes])
-    setNotes(future[0])
-    setFuture(prev => prev.slice(1))
+  function onLongPressStart(event: React.TouchEvent) {
+    const touch = event.touches[0]
+    if (!touch) return
+    timerRef.current = window.setTimeout(() => {
+      const el = document.elementFromPoint(touch.clientX, touch.clientY)
+      const svg = el?.closest('svg')
+      if (!svg || !el?.closest('.notation-host')) return
+      const rect = svg.getBoundingClientRect()
+      const x = (touch.clientX - rect.left) * (svg.viewBox.baseVal.width / rect.width)
+      if (x < 70) setPopup({ kind: 'clef', x: touch.clientX, y: touch.clientY + 12 })
+      else if (x < 100) setPopup({ kind: 'time', x: touch.clientX, y: touch.clientY + 12 })
+      else if (x < 150) setPopup({ kind: 'key', x: touch.clientX, y: touch.clientY + 12 })
+    }, 520)
   }
-  function clearScore() {
-    if (window.confirm('Xóa toàn bộ ký hiệu trên bản nhạc?')) commit([])
+  function cancelLongPress() {
+    if (timerRef.current !== null) window.clearTimeout(timerRef.current)
+    timerRef.current = null
   }
 
-  return <main className="app-shell">
-    <header className="topbar">
-      <div className="brand"><div className="brand-mark">M</div><div><strong>MeloLegacy</strong><span>PHÒNG SOẠN NHẠC</span></div></div>
-      <div className="top-actions"><span className="save-state"><i />{status}</span><button className="gold-button" onClick={() => window.print()}>Xuất / In</button></div>
-    </header>
-    <section className="workspace">
-      <aside className="tool-panel">
-        <div className="panel-heading">TÁC PHẨM</div>
-        <label className="field-label" htmlFor="score-title">Tên tác phẩm</label>
-        <input id="score-title" className="title-input" value={title} onChange={e => setTitle(e.target.value)} />
-        <div className="panel-heading">BỐ CỤC KHUÔNG NHẠC</div>
-        <div className="layout-options">
-          {(['solo', 'large', 'grand', 'orchestra'] as Layout[]).map((item, index) => <button key={item} className={layout === item ? 'layout-choice selected' : 'layout-choice'} onClick={() => setLayout(item)}><span className="layout-icon">{['≋', '☰', '𝄞\n𝄢', '♬'][index]}</span><span><b>{['Solo', 'Khuông lớn', 'Đại khuông', 'Dàn nhạc'][index]}</b><small>{['10 khuông · Một bè', '6 khuông · Cỡ lớn', 'Sol + Fa · Piano', '4 bè · Phác thảo tổng phổ'][index]}</small></span></button>)}
+  function drawStart(event: React.PointerEvent<SVGSVGElement>) {
+    if (!penMode) return
+    const rect = event.currentTarget.getBoundingClientRect()
+    const point = `${((event.clientX - rect.left) / rect.width) * 1000},${((event.clientY - rect.top) / rect.height) * 1000}`
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setActiveStroke(point)
+  }
+  function drawMove(event: React.PointerEvent<SVGSVGElement>) {
+    if (!penMode || !activeStroke || event.buttons === 0) return
+    const rect = event.currentTarget.getBoundingClientRect()
+    const point = `${((event.clientX - rect.left) / rect.width) * 1000},${((event.clientY - rect.top) / rect.height) * 1000}`
+    setActiveStroke(value => value + ' ' + point)
+  }
+  function drawEnd() {
+    if (activeStroke) setStrokes(value => [...value, activeStroke])
+    setActiveStroke('')
+  }
+
+  const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+  return <div className="composer-interaction-shell"
+    onClickCapture={event => { if (!penMode) openInlineSetting(event) }}
+    onDoubleClickCapture={event => { if (!penMode) openClef(event) }}
+    onContextMenuCapture={event => { if (!penMode && openClef(event)) event.preventDefault() }}
+    onTouchStartCapture={onLongPressStart}
+    onTouchEndCapture={cancelLongPress}
+    onTouchMoveCapture={cancelLongPress}>
+    <ComposerRoomBase />
+    <div className="composer-pen-tools">
+      <button className={penMode ? 'pen-toggle active' : 'pen-toggle'} onClick={() => { setPenMode(value => !value); setPopup(null) }}>✎ {penMode ? 'Đang viết' : 'Bút viết'}</button>
+      {penMode && <button className="pen-clear" onClick={() => setStrokes([])}>Xóa nét</button>}
+    </div>
+    <div className={penMode ? 'pen-layer enabled' : 'pen-layer'} aria-label="Lớp viết tay trên khuông nhạc">
+      <svg viewBox="0 0 1000 1000" preserveAspectRatio="none"
+        onPointerDown={drawStart} onPointerMove={drawMove} onPointerUp={drawEnd} onPointerCancel={drawEnd}>
+        {strokes.map((stroke, index) => <polyline key={index} points={stroke} fill="none" stroke="#245b9a" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />)}
+        {activeStroke && <polyline points={activeStroke} fill="none" stroke="#245b9a" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
+      </svg>
+    </div>
+    {popup && <div className="notation-picker" style={{ left: popup.x, top: popup.y }} onPointerDown={event => event.stopPropagation()}>
+      <div className="picker-head"><b>{popup.kind === 'clef' ? 'Chọn khóa nhạc' : popup.kind === 'key' ? 'Vòng tròn quãng năm' : 'Số chỉ nhịp'}</b><button onClick={() => setPopup(null)}>×</button></div>
+      {popup.kind === 'clef' && <div className="clef-wheel">{CLEFS.map(item => <button key={item.value} onClick={() => { setNativeSelect('clef', item.value); setPopup(null) }}><strong>{item.symbol}</strong><span>{item.label}</span></button>)}</div>}
+      {popup.kind === 'key' && <div className="fifths-wheel" role="group" aria-label="Vòng tròn quãng năm"
+        onPointerDown={event => {
+          const rect = event.currentTarget.getBoundingClientRect()
+          const angle = Math.atan2(event.clientY - rect.top - rect.height / 2, event.clientX - rect.left - rect.width / 2) * 180 / Math.PI
+          wheelDragRef.current = { startAngle: angle, startRotation: wheelRotation, moved: false }
+        }}
+        onPointerMove={event => {
+          const drag = wheelDragRef.current
+          if (!drag) return
+          const rect = event.currentTarget.getBoundingClientRect()
+          const angle = Math.atan2(event.clientY - rect.top - rect.height / 2, event.clientX - rect.left - rect.width / 2) * 180 / Math.PI
+          const delta = ((angle - drag.startAngle + 540) % 360) - 180
+          if (Math.abs(delta) > 4) drag.moved = true
+          if (drag.moved) setWheelRotation(drag.startRotation + delta)
+        }}
+        onPointerUp={() => {
+          const drag = wheelDragRef.current
+          wheelDragRef.current = null
+          if (!drag?.moved) return
+          wheelSuppressClickRef.current = true
+          const snapped = Math.round(wheelRotation / 30) * 30
+          setWheelRotation(snapped)
+          const index = ((-Math.round(snapped / 30)) % 12 + 12) % 12
+          setNativeSelect('key', FIFTHS[index])
+          setPopup(null)
+        }}
+        onPointerCancel={() => { wheelDragRef.current = null }}>
+        {FIFTHS.map((key, index) => {
+          const angle = (index * 30 + wheelRotation - 90) * Math.PI / 180
+          return <button key={key} style={{ left: `${50 + Math.cos(angle) * 39}%`, top: `${50 + Math.sin(angle) * 39}%` }} onClick={() => { if (wheelSuppressClickRef.current) { wheelSuppressClickRef.current = false; return } setNativeSelect('key', key); setPopup(null) }}><b>{key}</b><small>{KEY_LABELS[key]}</small></button>
+        })}
+        <div className="fifths-center"><b>{FIFTHS[((-Math.round(wheelRotation / 30)) % 12 + 12) % 12]}</b><span>Quãng năm</span></div>
+      </div>}
+      {popup.kind === 'time' && <div className="time-picker">
+        <label>Tử số</label>
+        <div className="number-roller" onScroll={event => { const el = event.currentTarget; const item = el.querySelector<HTMLElement>('[data-number]'); if (item) setTimeTop(Math.max(1, Math.min(9, Math.round((el.scrollLeft + el.clientWidth / 2 - item.offsetWidth / 2) / item.offsetWidth) + 1))) }}>
+          {numbers.map(number => <button data-number key={number} className={timeTop === number ? 'chosen' : ''} onClick={event => { setTimeTop(number); event.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }) }}>{number}</button>)}
         </div>
-        <div className="panel-heading">TRƯỜNG ĐỘ · KÝ HIỆU CHUẨN</div>
-        <div className="duration-grid">
-          {DURATIONS.map(item => <button key={item.value} className={duration === item.value ? 'duration selected' : 'duration'} onClick={() => { setDuration(item.value); setRest(false) }}><span>{item.glyph}</span><small>{item.label}</small></button>)}
+        <label>Mẫu số</label>
+        <div className="number-roller" onScroll={event => { const el = event.currentTarget; const item = el.querySelector<HTMLElement>('[data-number]'); if (item) setTimeBottom(Math.max(1, Math.min(9, Math.round((el.scrollLeft + el.clientWidth / 2 - item.offsetWidth / 2) / item.offsetWidth) + 1))) }}>
+          {numbers.map(number => <button data-number key={number} className={timeBottom === number ? 'chosen' : ''} onClick={event => { setTimeBottom(number); event.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }) }}>{number}</button>)}
         </div>
-        <div className="note-options">
-          <button className={dotted ? 'mini-tool selected' : 'mini-tool'} onClick={() => setDotted(!dotted)}>·　Chấm dôi</button>
-          <button className={rest ? 'mini-tool selected' : 'mini-tool'} onClick={() => setRest(!rest)}>𝄽　Dấu nghỉ</button>
-        </div>
-        <div className="panel-heading">DẤU HÓA</div>
-        <div className="accidental-grid">{([{ value: '', label: 'Không' }, { value: '#', label: 'Thăng ♯' }, { value: 'b', label: 'Giáng ♭' }, { value: 'n', label: 'Bình ♮' }] as const).map(item => <button key={item.value || 'none'} className={accidental === item.value ? 'mini-tool selected' : 'mini-tool'} onClick={() => setAccidental(item.value)}>{item.label}</button>)}</div>
-        <div className="panel-heading">KHÓA · NHỊP · HÓA BIỂU</div>
-        <label className="field-label" htmlFor="clef">Khóa nhạc</label><select id="clef" className="title-input" value={clef} onChange={e => setClef(e.target.value as typeof clef)}><option value="treble">Khóa Sol</option><option value="bass">Khóa Fa</option><option value="alto">Khóa Đô (Alto)</option><option value="tenor">Khóa Đô (Tenor)</option></select>
-        <div className="setting-row"><label className="field-label" htmlFor="time">Nhịp</label><select id="time" value={time} onChange={e => setTime(e.target.value)}><option>4/4</option><option>3/4</option><option>2/4</option><option>6/8</option><option>9/8</option><option>12/8</option></select></div>
-        <div className="setting-row"><label className="field-label" htmlFor="key">Hóa biểu</label><select id="key" value={keySig} onChange={e => setKeySig(e.target.value)}>{['C','G','D','A','E','B','F','Bb','Eb','Ab','Db','Gb'].map(k => <option key={k}>{k}</option>)}</select></div>
-        <div className="panel-heading">ÂM NHẠC · PHÁT LẠI</div>
-        <div className="setting-row"><label className="field-label" htmlFor="tempo">Tempo ♩</label><input id="tempo" type="number" min="20" max="300" value={tempo} onChange={e => setTempo(Number(e.target.value))}/></div>
-        <div className="setting-row"><label className="field-label" htmlFor="dynamic">Cường độ</label><select id="dynamic" value={dynamic} onChange={e => setDynamic(e.target.value)}>{['pp','p','mp','mf','f','ff'].map(v => <option key={v}>{v}</option>)}</select></div>
-        <div className="action-stack"><button onClick={undo} disabled={!history.length}>↶　Hoàn tác</button><button onClick={redo} disabled={!future.length}>↷　Làm lại</button><button onClick={clearScore}>⌫　Xóa bản nhạc</button></div>
-        <p className="hint">Chọn trường độ và chạm đúng vị trí trên khuông để ghi nốt. Các nốt được khắc bằng bộ máy ký âm VexFlow.</p>
-        <div className="panel-foot">Bản nhạc lưu cục bộ trên thiết bị này.</div>
-      </aside>
-      <section className="score-area">
-        <div className="score-toolbar"><div><span className="crumb">MeloLegacy</span><span className="slash">/</span><b>Phòng Soạn Nhạc</b></div><div className="zoom-label">A4 · Dọc · {systems} hệ thống</div></div>
-        <div className="paper-wrap"><div className="paper" style={{ minHeight: paperHeight }}>
-          <div className="paper-head"><div className="paper-kicker">MELOLEGACY · MUSIC COMPOSITION</div><h1>{title || 'Tác phẩm mới'}</h1><div className="paper-meta"><span>Tác giả: __________________</span><span>♩ = {tempo}　{dynamic}</span></div></div>
-          <div className="notation-host" ref={scoreRef} onClick={addFromCanvas} style={{ minHeight: paperHeight - 180 }} />
-          <div className="paper-bottom"><span>MeloLegacy · Di sản âm nhạc</span><span>Trang 1</span></div>
-        </div></div>
-      </section>
-    </section>
-    <footer className="mobile-note">Chọn trường độ rồi chạm vào khuông nhạc để ghi nốt. Xoay iPad ngang để có vùng làm việc rộng hơn.</footer>
-  </main>
+        <button className="apply-time" onClick={() => { setNativeSelect('time', `${timeTop}/${timeBottom}`); setPopup(null) }}>Áp dụng nhịp {timeTop}/{timeBottom}</button>
+      </div>}
+    </div>}
+  </div>
 }
-export default App
