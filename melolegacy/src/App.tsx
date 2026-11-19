@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import ComposerRoomBase from './ComposerRoomBase'
 
 type Popup = { kind: 'clef' | 'key' | 'time'; x: number; y: number } | null
@@ -38,6 +39,11 @@ function setNativeSelect(id: string, value: string) {
 export default function App() {
   const [popup, setPopup] = useState<Popup>(null)
   const [libraryOpen, setLibraryOpen] = useState(false)
+  const [symbolsOpen, setSymbolsOpen] = useState(false)
+  const [tempoOpen, setTempoOpen] = useState(false)
+  const [recording, setRecording] = useState(false)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const recordChunksRef = useRef<Blob[]>([])
   const [activeGroup, setActiveGroup] = useState('notes')
   const [dock, setDock] = useState<'top'|'bottom'|'left'|'right'>('bottom')
   const [palettePoint, setPalettePoint] = useState<{x:number;y:number}|null>(null)
@@ -152,21 +158,25 @@ export default function App() {
     onTouchEndCapture={cancelLongPress}
     onTouchMoveCapture={cancelLongPress}>
     <ComposerRoomBase />
-    <div className="notation-library-trigger"><button aria-label="Mở thư viện ký hiệu âm nhạc" title="Thư viện ký hiệu âm nhạc" onClick={() => setLibraryOpen(value => !value)}>𝅗𝅥</button></div>
-    {libraryOpen && <section className={`notation-library dock-${dock}`} style={palettePoint ? {left:palettePoint.x,top:palettePoint.y,right:'auto',bottom:'auto'} : undefined}>
-      <header className="notation-library-head" onPointerDown={event => { if ((event.target as HTMLElement).closest('button')) return; const r=event.currentTarget.parentElement!.getBoundingClientRect(); setPaletteDrag({x:event.clientX,y:event.clientY,left:r.left,top:r.top}); event.currentTarget.setPointerCapture(event.pointerId) }} onPointerMove={event => { if(!paletteDrag)return; setPalettePoint({x:Math.max(4,Math.min(window.innerWidth-280,paletteDrag.left+event.clientX-paletteDrag.x)),y:Math.max(4,Math.min(window.innerHeight-180,paletteDrag.top+event.clientY-paletteDrag.y))}) }} onPointerUp={() => setPaletteDrag(null)} onPointerCancel={() => setPaletteDrag(null)}>
-        <div><b>Thư viện ký hiệu</b><small>SMuFL · MusicXML · MeloLegacy</small></div><button onClick={() => setLibraryOpen(false)}>×</button>
-      </header>
-      <div className="notation-library-layout">
-        <nav className="notation-library-groups">{SYMBOL_GROUPS.map(group=><button key={group.id} className={activeGroup===group.id?'active':''} onClick={()=>setActiveGroup(group.id)}>{group.name}</button>)}</nav>
-        <div className="notation-library-content">
-          <div className="notation-library-group-title">{SYMBOL_GROUPS.find(group=>group.id===activeGroup)?.name}</div>
-          <div className="notation-symbol-strip">{(SYMBOL_GROUPS.find(group=>group.id===activeGroup)?.items ?? []).map(([glyph,label])=><button key={label} className={selectedSymbol===label?'selected':''} title={label} onClick={()=>{setSelectedSymbol(label); if(activeGroup==='notes'){const b=Array.from(document.querySelectorAll<HTMLButtonElement>('.duration')).find(el=>el.innerText.includes(glyph));b?.click()} else if(activeGroup==='accidentals'){const map:Record<string,string>={'♯':'Thăng ♯','♭':'Giáng ♭','♮':'Bình ♮'};const b=Array.from(document.querySelectorAll<HTMLButtonElement>('.accidental-grid button')).find(el=>map[glyph]&&el.innerText.includes(map[glyph]));b?.click()} else if(activeGroup==='clefs'){const map:Record<string,string>={'𝄞':'treble','𝄢':'bass','𝄡':'alto'};if(map[glyph])setNativeSelect('clef',map[glyph])} else if(activeGroup==='dynamics'){const s=document.getElementById('dynamic') as HTMLSelectElement|null;if(s && ['pp','p','mp','mf','f','ff'].includes(glyph)){s.value=glyph;s.dispatchEvent(new Event('change',{bubbles:true}))}} }}>{glyph}<small>{label}</small></button>)}</div>
-        </div>
+    {createPortal(<div className="composer-commandbar">
+      <div className="composer-command-main">
+        <button className={libraryOpen?'command-active':''} aria-label="Thư viện ký hiệu" title="Thư viện ký hiệu" onClick={()=>{setLibraryOpen(v=>!v);setSymbolsOpen(false);setTempoOpen(false)}}>𝅗𝅥</button>
+        <button className={penMode?'command-active':''} aria-label="Bút viết" title="Bút viết" onClick={()=>{setPenMode(v=>!v);setLibraryOpen(false);setSymbolsOpen(false)}}>✎</button>
+        <button className={recording?'command-recording':''} aria-label="Thu âm" title="Thu âm" onClick={async()=>{if(recording){recorderRef.current?.stop();setRecording(false);return}try{const stream=await navigator.mediaDevices.getUserMedia({audio:true});const recorder=new MediaRecorder(stream);recorderRef.current=recorder;recordChunksRef.current=[];recorder.ondataavailable=e=>{if(e.data.size)recordChunksRef.current.push(e.data)};recorder.onstop=()=>{const blob=new Blob(recordChunksRef.current,{type:recorder.mimeType||'audio/webm'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='MeloLegacy-ban-thu-am.webm';a.click();URL.revokeObjectURL(url);stream.getTracks().forEach(t=>t.stop())};recorder.start();setRecording(true)}catch{alert('MeloLegacy cần quyền truy cập micro để thu âm.')}}}>{recording?'●':'🎙'}</button>
+        <button className={tempoOpen?'command-active':''} aria-label="Máy nhịp" title="Máy nhịp" onClick={()=>{setTempoOpen(v=>!v);setLibraryOpen(false);setSymbolsOpen(false)}}>♩⌁</button>
       </div>
-      <footer className="notation-library-foot"><span>Đang chọn: {selectedSymbol || 'Chưa chọn ký hiệu'}</span><div>{(['top','bottom','left','right'] as const).map(side=><button key={side} className={dock===side?'active':''} onClick={()=>{setDock(side);setPalettePoint(null)}}>{({top:'Trên',bottom:'Dưới',left:'Trái',right:'Phải'} as const)[side]}</button>)}</div></footer>
-    </section>}
-    <div className="composer-pen-tools">
+      {libraryOpen&&<div className="notation-category-popover">
+        <div className="notation-popover-heading"><b>Nhóm ký hiệu</b><button onClick={()=>setLibraryOpen(false)}>×</button></div>
+        <div className="notation-category-list">{SYMBOL_GROUPS.map(group=><button key={group.id} onClick={()=>{setActiveGroup(group.id);setSymbolsOpen(true);setLibraryOpen(false)}}>{group.name}</button>)}</div>
+        <div className="notation-dock-options">{(['top','bottom','left','right'] as const).map(side=><button key={side} className={dock===side?'active':''} onClick={()=>setDock(side)}>{({top:'Trên',bottom:'Dưới',left:'Trái',right:'Phải'} as const)[side]}</button>)}</div>
+      </div>}
+      {symbolsOpen&&<div className={`notation-symbol-rail rail-${dock}`}>
+        <div className="notation-rail-title"><b>{SYMBOL_GROUPS.find(g=>g.id===activeGroup)?.name}</b><button onClick={()=>setSymbolsOpen(false)}>×</button></div>
+        <div className="notation-rail-items">{(SYMBOL_GROUPS.find(g=>g.id===activeGroup)?.items??[]).map(([glyph,label])=><button key={label} title={label} className={selectedSymbol===label?'selected':''} onClick={()=>{setSelectedSymbol(label);if(activeGroup==='notes'){const i=['𝅝','𝅗𝅥','♩','♪','𝅘𝅥𝅯','𝅘𝅥𝅰'].indexOf(glyph);const vals=['w','h','q','8','16','32'];if(i>=0){const b=document.querySelector<HTMLButtonElement>(`.duration-grid button:nth-child(${i+1})`);b?.click()}}else if(activeGroup==='accidentals'){const map:Record<string,string>={'♯':'#','♭':'b','♮':'n','𝄪':'#','𝄫':'b'};const s=document.querySelector<HTMLSelectElement>('#accidental');if(s&&map[glyph]){s.value=map[glyph];s.dispatchEvent(new Event('change',{bubbles:true}))}else{const idx={'♯':1,'♭':2,'♮':3,'𝄪':1,'𝄫':2}[glyph];document.querySelectorAll<HTMLButtonElement>('.accidental-grid button')[idx]?.click()}}else if(activeGroup==='clefs'){const map:Record<string,string>={'𝄞':'treble','𝄢':'bass','𝄡':'alto','𝄥':'treble'};if(map[glyph])setNativeSelect('clef',map[glyph])}else if(activeGroup==='dynamics'){const s=document.getElementById('dynamic') as HTMLSelectElement|null;if(s&&['pp','p','mp','mf','f','ff'].includes(glyph)){s.value=glyph;s.dispatchEvent(new Event('change',{bubbles:true}))}}else if(activeGroup==='time'){const s=document.getElementById('time') as HTMLSelectElement|null;if(s&&['3/4','4/4','6/8'].includes(glyph)){s.value=glyph;s.dispatchEvent(new Event('change',{bubbles:true}))}}}}>{glyph}<small>{label}</small></button>)}</div>
+      </div>}
+      {tempoOpen&&<div className="notation-tempo-popover"><label>Tempo · BPM</label><input type="number" min="20" max="300" defaultValue="80" onChange={e=>{const s=document.getElementById('tempo') as HTMLInputElement|null;if(s){s.value=e.target.value;s.dispatchEvent(new Event('input',{bubbles:true}))}}}/><button onClick={()=>setTempoOpen(false)}>Xong</button></div>}
+    </div>,document.querySelector('.score-toolbar')??document.body)}
+    <div className="composer-pen-tools" style={{display:"none"}}>
       <button className={penMode ? 'pen-toggle active' : 'pen-toggle'} onClick={() => { setPenMode(value => !value); setPopup(null) }}>✎ {penMode ? 'Đang viết' : 'Bút viết'}</button>
       {penMode && <button className="pen-clear" onClick={() => setStrokes([])}>Xóa nét</button>}
     </div>

@@ -65,3 +65,34 @@ html,body,#root{width:100%;height:100%;margin:0;overflow:hidden}
 .notation-library-content{flex:1;min-width:0;overflow:auto;padding:12px}.notation-library-group-title{font-size:12px;font-weight:700;color:#806334;margin-bottom:10px}.notation-symbol-strip{display:flex;flex-wrap:wrap;gap:7px}.notation-symbol-strip button{min-width:66px;min-height:66px;border:1px solid #e8decb;border-radius:9px;background:#fff;padding:7px 5px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font:26px Georgia,serif;color:#453821}.notation-symbol-strip button small{font:9px Inter, sans-serif;color:#85765e;text-align:center}.notation-symbol-strip button.selected{border-color:#b28a45;background:#f8f0df}
 .notation-library-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;border-top:1px solid #eee5d5;font-size:10px;color:#84765e}.notation-library-foot div{display:flex;gap:4px}.notation-library-foot button{border:1px solid #e5dac5;background:#fff;border-radius:6px;padding:6px 8px;font-size:10px;color:#6d5936}.notation-library-foot button.active{background:#a9823e;color:#fff;border-color:#a9823e}
 @media(max-width:760px){.topbar{height:52px;min-height:52px;padding:0 10px}.brand strong{font-size:14px}.brand span{font-size:8px}.top-actions{gap:5px}.save-state{display:none}.mode-switch button{font-size:9px;padding:6px}.gold-button{font-size:9px;padding:7px}.score-toolbar{height:38px;min-height:38px;padding:0 10px}.score-toolbar>div:first-child{font-size:10px}.reader-actions{gap:4px}.reader-actions button{font-size:9px;padding:5px 7px}.zoom-label{display:none}.paper{padding:20px 10px 34px}.paper h1{font-size:20px}.notation-library{width:calc(100vw - 16px);max-height:56dvh;bottom:78px}.notation-library.dock-left,.notation-library.dock-right{width:min(330px,calc(100vw - 20px));max-height:72dvh}.notation-library-groups{width:130px;min-width:112px;padding:5px}.notation-library-groups button{font-size:10px;padding:8px 6px}.notation-symbol-strip button{min-width:56px;min-height:58px;font-size:23px}.notation-library-foot{flex-wrap:wrap}.notation-library-trigger{right:12px;bottom:12px}.notation-library-trigger button{width:48px;height:48px;font-size:30px}}
+
+/* Compact Notion-inspired notation controls, docked inside the fixed score toolbar */
+.score-toolbar{position:sticky!important;top:0!important;z-index:70!important;display:flex;align-items:center;min-height:52px!important}
+.composer-commandbar{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:100;display:flex;align-items:center;gap:8px}
+.composer-command-main{display:flex;align-items:center;gap:5px;padding:3px 7px;border:1px solid #e7ddc9;border-radius:10px;background:#fffdf8;box-shadow:0 2px 8px #3b2b1512}
+.composer-command-main>button{width:36px;height:34px;border:0;border-radius:7px;background:transparent;color:#80612d;font-size:23px;display:grid;place-items:center}
+.composer-command-main>button.command-active{background:#f0e5cf;color:#795820}
+.composer-command-main>button.command-recording{background:#fbe5e1;color:#b42318}
+.notation-category-popover,.notation-tempo-popover{position:absolute;top:calc(100% + 7px);left:0;width:min(330px,calc(100vw - 24px));background:#fffefa;border:1px solid #dfd0b2;border-radius:10px;box-shadow:0 8px 25px #2f261c24;padding:9px;z-index:110;color:#4b3e29}
+.notation-popover-heading{display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:2px 3px 7px}
+.notation-popover-heading button,.notation-rail-title button{border:0;background:transparent;font-size:18px;color:#82683e}
+.notation-category-list{display:flex;flex-wrap:wrap;gap:5px;max-height:150px;overflow:auto}
+.notation-category-list button,.notation-dock-options button{border:1px solid #e8decc;border-radius:7px;background:#fff;padding:7px 8px;font-size:10px;color:#64543a}
+.notation-dock-options{display:flex;gap:5px;border-top:1px solid #eee5d6;margin-top:8px;padding-top:7px}
+.notation-dock-options button.active{background:#a9823e;color:white;border-color:#a9823e}
+.notation-symbol-rail{position:fixed;z-index:90;display:flex;align-items:center;gap:6px;padding:5px 8px;background:#fffefa;border:1px solid #dfd0b2;border-radius:10px;box-shadow:0 5px 18px #2f261c20;max-width:calc(100vw - 18px);max-height:calc(100dvh - 100px)}
+.notation-symbol-rail.rail-top{top:calc(var(--melo-toolbar-bottom, 120px));left:50%;transform:translateX(-50%);flex-direction:column;align-items:stretch}
+.notation-symbol-rail.rail-bottom{bottom:10px;left:50%;transform:translateX(-50%);flex-direction:column;align-items:stretch}
+.notation-symbol-rail.rail-left{left:8px;top:50%;transform:translateY(-50%);flex-direction:row;align-items:stretch}
+.notation-symbol-rail.rail-right{right:8px;top:50%;transform:translateY(-50%);flex-direction:row;align-items:stretch}
+.notation-rail-title{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:#806334;white-space:nowrap}
+.notation-rail-items{display:flex;gap:4px;overflow-x:auto;overflow-y:hidden;max-width:min(78vw,720px);scrollbar-width:thin}
+.rail-left .notation-rail-items,.rail-right .notation-rail-items{flex-direction:column;overflow-y:auto;overflow-x:hidden;max-height:62dvh;max-width:unset}
+.notation-rail-items button{min-width:46px;height:48px;border:1px solid #eee5d5;border-radius:7px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font:22px Georgia,serif;color:#493a22;padding:3px}
+.notation-rail-items button small{font:8px Inter,sans-serif;color:#82745e;white-space:nowrap}
+.notation-rail-items button.selected{background:#f5ecd9;border-color:#b18a48}
+.notation-tempo-popover{left:auto;right:0;width:150px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:10px}
+.notation-tempo-popover input{width:58px;border:1px solid #e5dac5;border-radius:6px;padding:5px}
+.notation-tempo-popover button{border:0;background:#a9823e;color:#fff;border-radius:6px;padding:6px 8px}
+.notation-library-trigger,.notation-library{display:none!important}
+@media(max-width:760px){.score-toolbar{padding-left:7px!important;padding-right:7px!important}.composer-commandbar{left:auto;right:8px;transform:translateY(-50%)}.composer-command-main{gap:2px;padding:2px 4px}.composer-command-main>button{width:30px;height:30px;font-size:19px}.notation-category-popover{left:auto;right:0;width:min(300px,calc(100vw - 18px))}.notation-symbol-rail.rail-top{top:132px}.notation-symbol-rail.rail-bottom{bottom:8px}.notation-symbol-rail.rail-left{left:5px}.notation-symbol-rail.rail-right{right:5px}.notation-rail-items{max-width:calc(100vw - 32px)}}
