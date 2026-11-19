@@ -40,3 +40,64 @@ test('Lyre view can be selected and switched back to Neuron', async ({ page }) =
   await page.getByRole('button', { name: /Sơ đồ Neuron/ }).click()
   await expect(page.locator('.neuron-stage')).toBeVisible()
 })
+
+
+test('selected branch details update and reset when changing rooms', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Bản đồ Melo' }).click()
+  await page.getByRole('button', { name: /Nhận dạng PDF/ }).click()
+  await expect(page.getByRole('heading', { name: 'Nhận dạng PDF' })).toBeVisible()
+  await expect(page.getByText(/Đưa bản nhạc PDF qua Audiveris/)).toBeVisible()
+  await page.getByRole('button', { name: /Thu Âm/ }).click()
+  await expect(page.getByRole('heading', { name: 'Phòng Thu Âm' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Nhận dạng PDF' })).toHaveCount(0)
+})
+
+test('room nodes have touch targets of at least 44 by 44 CSS pixels', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Bản đồ Melo' }).click()
+  const sizes = await page.locator('.melo-room-node').evaluateAll(nodes =>
+    nodes.map(node => {
+      const rect = node.getBoundingClientRect()
+      return { label: node.textContent?.trim(), width: rect.width, height: rect.height }
+    })
+  )
+  expect(sizes.length).toBeGreaterThanOrEqual(10)
+  for (const node of sizes) {
+    expect(node.width, `${node.label} width`).toBeGreaterThanOrEqual(44)
+    expect(node.height, `${node.label} height`).toBeGreaterThanOrEqual(44)
+  }
+})
+
+test('room nodes do not overlap in either map view', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Bản đồ Melo' }).click()
+  for (const viewName of ['Sơ đồ Neuron', 'Bản đồ Đàn Thiên Thần']) {
+    await page.getByRole('button', { name: new RegExp(viewName) }).click()
+    const overlaps = await page.locator('.melo-room-node').evaluateAll(nodes => {
+      const rects = nodes.map(node => {
+        const r = node.getBoundingClientRect()
+        return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, label: node.textContent?.trim() }
+      })
+      const collisions: string[] = []
+      for (let i = 0; i < rects.length; i++) {
+        for (let j = i + 1; j < rects.length; j++) {
+          const a = rects[i], b = rects[j]
+          if (a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top) {
+            collisions.push(`${a.label} overlaps ${b.label}`)
+          }
+        }
+      }
+      return collisions
+    })
+    expect(overlaps, `${viewName} node collisions`).toEqual([])
+  }
+})
+
+test('Lyre placeholder is explicit and does not claim the original asset is present', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Bản đồ Melo' }).click()
+  await page.getByRole('button', { name: /Bản đồ Đàn Thiên Thần/ }).click()
+  await expect(page.getByText(/Đang chờ ảnh Lyre vàng kim gốc/)).toBeVisible()
+  await expect(page.locator('.lyre-asset-required')).toBeVisible()
+})
