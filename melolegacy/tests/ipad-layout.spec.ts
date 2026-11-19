@@ -148,7 +148,7 @@ test('piano recording import extracts and stores chromatic samples locally', asy
   pcm.forEach((value, index) => wav.writeInt16LE(value, 44 + index * 2))
   await page.locator('input[accept*="audio/"]').setInputFiles({ name: 'piano-test.wav', mimeType: 'audio/wav', buffer: wav })
   await expect(page.getByText('3/45 nốt')).toBeVisible()
-  await expect(page.getByText('E2')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Nghe E2' })).toBeVisible()
   await page.getByRole('button', { name: 'Lưu bộ sample trên thiết bị' }).click()
   await expect(page.getByRole('status')).toContainText('Đã lưu 3 sample piano')
 })
