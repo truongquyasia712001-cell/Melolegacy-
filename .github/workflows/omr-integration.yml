@@ -44,7 +44,7 @@ jobs:
       - name: Generate a synthetic sheet-music PDF fixture
         run: |
           python3 -m venv /tmp/omr-test-venv
-          /tmp/omr-test-venv/bin/pip install --quiet verovio cairosvg
+          /tmp/omr-test-venv/bin/pip install --quiet reportlab
           /tmp/omr-test-venv/bin/python melolegacy/omr-service/tests/generate_fixture.py /tmp/melolegacy-omr-fixture.pdf
       - name: Run PDF through Audiveris and assert MusicXML output
         run: |
