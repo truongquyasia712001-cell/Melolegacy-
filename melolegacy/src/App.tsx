@@ -2,7 +2,22 @@ import { useEffect, useRef, useState } from 'react'
 import ComposerRoomBase from './ComposerRoomBase'
 
 type Popup = { kind: 'clef' | 'key' | 'time'; x: number; y: number } | null
-const CLEFS = [
+
+const SYMBOL_GROUPS = [
+ {id:'notes',name:'Nốt nhạc & dấu nghỉ',items:[['𝅝','Nốt tròn'],['𝅗𝅥','Nốt trắng'],['♩','Nốt đen'],['♪','Móc đơn'],['𝅘𝅥𝅯','Móc kép'],['𝅘𝅥𝅰','Móc ba'],['𝄻','Dấu nghỉ tròn'],['𝄼','Dấu nghỉ trắng'],['𝄽','Dấu nghỉ đen'],['𝄾','Dấu nghỉ móc đơn'],['𝄿','Dấu nghỉ móc kép']]},
+ {id:'clefs',name:'Khóa nhạc',items:[['𝄞','Khóa Sol'],['𝄢','Khóa Fa'],['𝄡','Khóa Đô'],['𝄥','Khóa trung tính']]},
+ {id:'accidentals',name:'Dấu hóa',items:[['♯','Thăng'],['♭','Giáng'],['♮','Bình'],['𝄪','Thăng kép'],['𝄫','Giáng kép']]},
+ {id:'time',name:'Nhịp & tiết tấu',items:[['𝄴','Alla breve'],['𝄵','Nhịp thông thường'],['3/4','Nhịp 3/4'],['4/4','Nhịp 4/4'],['6/8','Nhịp 6/8']]},
+ {id:'dynamics',name:'Cường độ',items:[['pp','Pianissimo'],['p','Piano'],['mp','Mezzo piano'],['mf','Mezzo forte'],['f','Forte'],['ff','Fortissimo'],['sfz','Sforzando'],['cresc.','Crescendo'],['dim.','Diminuendo']]},
+ {id:'articulation',name:'Ngắt – nhấn – diễn tấu',items:[[' stacc.','Staccato'],['–','Tenuto'],['>','Accent'],['^','Marcato'],['𝄐','Fermata'],['𝄒','Breath mark']]},
+ {id:'ornaments',name:'Dấu láy & trang trí',items:[['𝆓','Trill'],['𝆔','Mordent'],['𝆕','Inverted mordent'],['𝆖','Turn'],['𝆗','Inverted turn'],['𝆘','Shake']]},
+ {id:'lines',name:'Dấu nối & đường biểu cảm',items:[['⌒','Slur'],['‿','Tie'],['𝆑','Crescendo hairpin'],['𝆒','Diminuendo hairpin'],['8va','Ottava alta'],['8vb','Ottava bassa']]},
+ {id:'repeats',name:'Lặp & điều hướng',items:[['𝄆','Mở dấu lặp'],['𝄇','Đóng dấu lặp'],['𝄋','Segno'],['𝄌','Coda'],['D.C.','Da capo'],['D.S.','Dal segno'],['Fine','Fine']]},
+ {id:'octave',name:'Quãng tám & chuyển vị',items:[['8va','Lên quãng tám'],['8vb','Xuống quãng tám'],['15ma','Lên hai quãng tám'],['15mb','Xuống hai quãng tám']]},
+ {id:'text',name:'Chữ & chỉ dẫn',items:[['♩=','Tempo'],['pizz.','Pizzicato'],['arco','Arco'],['sim.','Simile'],['rit.','Ritardando'],['accel.','Accelerando']]},
+ {id:'percussion',name:'Bộ gõ & nhạc cụ',items:[['𝄥','Khóa bộ gõ'],['x','Đầu nốt bộ gõ'],['○','Đầu nốt mở'],['+','Đầu nốt đóng']]},
+] as const
+\nconst CLEFS = [
   { value: 'treble', label: 'Sol', symbol: '𝄞' },
   { value: 'bass', label: 'Fa', symbol: '𝄢' },
   { value: 'alto', label: 'Đô Alto', symbol: '𝄡' },
@@ -20,7 +35,7 @@ function setNativeSelect(id: string, value: string) {
 }
 
 export default function App() {
-  const [popup, setPopup] = useState<Popup>(null)
+  const [popup, setPopup] = useState<Popup>(null)\n  const [libraryOpen, setLibraryOpen] = useState(false)\n  const [activeGroup, setActiveGroup] = useState('notes')\n  const [dock, setDock] = useState<'top'|'bottom'|'left'|'right'>('bottom')\n  const [palettePoint, setPalettePoint] = useState<{x:number;y:number}|null>(null)\n  const [selectedSymbol, setSelectedSymbol] = useState('')\n  const [paletteDrag, setPaletteDrag] = useState<{x:number;y:number;left:number;top:number}|null>(null)
   const [penMode, setPenMode] = useState(false)
   const [strokes, setStrokes] = useState<string[]>([])
   const [activeStroke, setActiveStroke] = useState('')
@@ -130,6 +145,20 @@ export default function App() {
     onTouchEndCapture={cancelLongPress}
     onTouchMoveCapture={cancelLongPress}>
     <ComposerRoomBase />
+    <div className="notation-library-trigger"><button aria-label="Mở thư viện ký hiệu âm nhạc" title="Thư viện ký hiệu âm nhạc" onClick={() => setLibraryOpen(value => !value)}>𝅗𝅥</button></div>
+    {libraryOpen && <section className={`notation-library dock-${dock}`} style={palettePoint ? {left:palettePoint.x,top:palettePoint.y,right:'auto',bottom:'auto'} : undefined}>
+      <header className="notation-library-head" onPointerDown={event => { if ((event.target as HTMLElement).closest('button')) return; const r=event.currentTarget.parentElement!.getBoundingClientRect(); setPaletteDrag({x:event.clientX,y:event.clientY,left:r.left,top:r.top}); event.currentTarget.setPointerCapture(event.pointerId) }} onPointerMove={event => { if(!paletteDrag)return; setPalettePoint({x:Math.max(4,Math.min(window.innerWidth-280,paletteDrag.left+event.clientX-paletteDrag.x)),y:Math.max(4,Math.min(window.innerHeight-180,paletteDrag.top+event.clientY-paletteDrag.y))}) }} onPointerUp={() => setPaletteDrag(null)} onPointerCancel={() => setPaletteDrag(null)}>
+        <div><b>Thư viện ký hiệu</b><small>SMuFL · MusicXML · MeloLegacy</small></div><button onClick={() => setLibraryOpen(false)}>×</button>
+      </header>
+      <div className="notation-library-layout">
+        <nav className="notation-library-groups">{SYMBOL_GROUPS.map(group=><button key={group.id} className={activeGroup===group.id?'active':''} onClick={()=>setActiveGroup(group.id)}>{group.name}</button>)}</nav>
+        <div className="notation-library-content">
+          <div className="notation-library-group-title">{SYMBOL_GROUPS.find(group=>group.id===activeGroup)?.name}</div>
+          <div className="notation-symbol-strip">{(SYMBOL_GROUPS.find(group=>group.id===activeGroup)?.items ?? []).map(([glyph,label])=><button key={label} className={selectedSymbol===label?'selected':''} title={label} onClick={()=>{setSelectedSymbol(label); if(activeGroup==='notes'){const b=Array.from(document.querySelectorAll<HTMLButtonElement>('.duration')).find(el=>el.innerText.includes(glyph));b?.click()} else if(activeGroup==='accidentals'){const map:Record<string,string>={'♯':'Thăng ♯','♭':'Giáng ♭','♮':'Bình ♮'};const b=Array.from(document.querySelectorAll<HTMLButtonElement>('.accidental-grid button')).find(el=>map[glyph]&&el.innerText.includes(map[glyph]));b?.click()} else if(activeGroup==='clefs'){const map:Record<string,string>={'𝄞':'treble','𝄢':'bass','𝄡':'alto'};if(map[glyph])setNativeSelect('clef',map[glyph])} else if(activeGroup==='dynamics'){const s=document.getElementById('dynamic') as HTMLSelectElement|null;if(s && ['pp','p','mp','mf','f','ff'].includes(glyph)){s.value=glyph;s.dispatchEvent(new Event('change',{bubbles:true}))}} }}>{glyph}<small>{label}</small></button>)}</div>
+        </div>
+      </div>
+      <footer className="notation-library-foot"><span>Đang chọn: {selectedSymbol || 'Chưa chọn ký hiệu'}</span><div>{(['top','bottom','left','right'] as const).map(side=><button key={side} className={dock===side?'active':''} onClick={()=>{setDock(side);setPalettePoint(null)}}>{({top:'Trên',bottom:'Dưới',left:'Trái',right:'Phải'} as const)[side]}</button>)}</div></footer>
+    </section>}
     <div className="composer-pen-tools">
       <button className={penMode ? 'pen-toggle active' : 'pen-toggle'} onClick={() => { setPenMode(value => !value); setPopup(null) }}>✎ {penMode ? 'Đang viết' : 'Bút viết'}</button>
       {penMode && <button className="pen-clear" onClick={() => setStrokes([])}>Xóa nét</button>}
