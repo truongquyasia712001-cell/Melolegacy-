@@ -10,3 +10,22 @@
 .melo-enter-composer span{font-size:16px}
 @media(max-width:1050px){.melo-detail-branches{grid-template-columns:repeat(2,minmax(0,1fr));max-height:none}.melo-map-branch-heading{grid-column:1/-1}}
 @media(max-width:650px){.melo-detail-branches{grid-template-columns:1fr;max-height:230px}.melo-map-branch-heading{margin-top:13px}}
+
+/* Expanded neuron branches */
+.branch-toggle{display:flex;align-items:center;justify-content:space-between;width:100%;border:0;background:transparent;text-align:left;cursor:pointer}
+.branch-toggle span{font-size:9px;letter-spacing:0;color:#e1c98f;font-weight:600}
+.melo-detail-branches{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-height:360px;padding:3px 2px 5px}
+.detail-branch.bubble-branch{min-height:58px;border-radius:13px;padding:7px 9px;background:radial-gradient(circle at 18px 18px,#42596b,#263a4d 72%);box-shadow:inset 0 1px #ffffff12;gap:9px}
+.branch-bubble-icon{display:grid;place-items:center;flex:none;width:34px;height:34px;border:1px solid #bda16d;border-radius:50%;background:radial-gradient(circle at 35% 25%,#e7d5aa,#88734e);font-size:17px}
+.branch-bubble-copy{display:flex;min-width:0;flex-direction:column;gap:3px}
+.branch-bubble-copy b{font-size:10px;line-height:1.25;font-weight:650}
+.branch-bubble-copy small{font-size:8px;color:#b6b9b7}
+.detail-branch.bubble-branch.selected{border-color:#e1c98f;background:linear-gradient(145deg,#4c4b40,#304254);box-shadow:0 0 0 2px #d6b77726}
+.world-stage{border:2px solid #b89559;box-shadow:inset 0 0 0 5px #b8955924,0 14px 38px #050d18aa}
+.lyre-asset-required{position:absolute;z-index:0;inset:12px;border:1px dashed #b8955977;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:18px;gap:5px;color:#e2c88e;text-align:center;pointer-events:none}
+.lyre-asset-required strong{font:18px Georgia,serif;letter-spacing:.4px}
+.lyre-asset-required span{max-width:390px;font-size:10px;line-height:1.5;color:#c1b59b}
+.world-stage .melo-room-node{z-index:2}
+@media(max-width:1050px){.melo-detail-branches{grid-template-columns:repeat(2,minmax(0,1fr));max-height:none}}
+@media(max-width:650px){.melo-detail-branches{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.detail-branch.bubble-branch{min-height:54px;padding:6px}.branch-bubble-icon{width:29px;height:29px;font-size:15px}.branch-bubble-copy b{font-size:9px}.lyre-asset-required{inset:7px}.lyre-asset-required strong{font-size:15px}}
+@media(pointer:coarse){.melo-room-node{min-height:82px}.detail-branch.bubble-branch{min-height:62px}.melo-view-switch button,.melo-map-back{min-height:42px}}
