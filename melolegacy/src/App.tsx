@@ -335,11 +335,6 @@ function App() {
         </section>}
       </aside>
       <section className="score-area">
-        <div className="omr-panel">
-          <div className="omr-copy"><strong>Nhận dạng bản nhạc PDF</strong><span>{omrMessage}</span>{omrJobId && <small>Mã xử lý: {omrJobId}</small>}</div>
-          <input ref={pdfInputRef} type="file" accept="application/pdf,.pdf" disabled={omrBusy} onChange={event => recognizePdf(event.target.files?.[0])} />
-          <button className="gold-button" disabled={omrBusy} onClick={() => pdfInputRef.current?.click()}>{omrBusy ? 'Đang nhận dạng…' : 'Tải PDF lên'}</button>
-        </div>
         <div className="score-toolbar"><div><span className="crumb">MeloLegacy</span><span className="slash">/</span><b>Phòng Soạn Nhạc</b></div><div className="zoom-label">A4 · Dọc · {systems} hệ thống</div></div>
         <div className="paper-wrap"><div className="paper" style={{ minHeight: paperHeight }}>
           <div className="paper-head"><div className="paper-kicker">MELOLEGACY · MUSIC COMPOSITION</div><h1>{title || 'Tác phẩm mới'}</h1><div className="paper-meta"><span>Tác giả: __________________</span><span>♩ = {tempo}　{dynamic}</span></div></div>
