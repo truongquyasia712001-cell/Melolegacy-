@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { Accidental, Beam, Formatter, Renderer, Stave, StaveNote, Voice, VexFlow } from 'vexflow'
+import { Accidental, Barline, Beam, Formatter, Renderer, Stave, StaveNote, Voice, VexFlow } from 'vexflow'
 import './App.css'
 import { loadLocalScore, saveLocalScore } from './localScoreStore'
 
@@ -7,6 +7,8 @@ type Duration = 'w' | 'h' | 'q' | '8' | '16' | '32'
 type NoteItem = { id: number; staff: number; measure: number; key: string; duration: Duration; dotted: boolean; accidental: '' | '#' | 'b' | 'n'; rest: boolean }
 type Layout = 'solo' | 'large' | 'grand' | 'orchestra'
 type ImportedScore = { notes: NoteItem[]; partCount: number; staffCount: number; title: string }
+type InkPoint = { x: number; y: number }
+type InkStroke = InkPoint[]
 function parseMusicXml(xml: string): ImportedScore {
   const doc = new DOMParser().parseFromString(xml, 'application/xml')
   if (doc.querySelector('parsererror')) throw new Error('Tệp MusicXML không hợp lệ.')
@@ -54,13 +56,15 @@ const DURATIONS: { value: Duration; label: string; glyph: string }[] = [
 const DIATONIC = ['c', 'd', 'e', 'f', 'g', 'a', 'b']
 const BEATS: Record<Duration, number> = { w: 4, h: 2, q: 1, '8': .5, '16': .25, '32': .125 }
 const SYSTEM_TOP = 82
-const SYSTEM_GAP = 86
-const GRAND_GAP = 124
-const STAFF_GROUP_GAP = 62
-const STAFF_SPACING = 8
+const SYSTEM_GAP = 102
+const GRAND_GAP = 102
+const STAFF_GROUP_GAP = 28
+const STAFF_SPACING = 4
 const STAFF_LINE_COUNT = 5
 const STAFF_HEIGHT = (STAFF_LINE_COUNT - 1) * STAFF_SPACING
-const MEASURES_PER_SYSTEM = 3
+const MEASURES_PER_SYSTEM = 5
+const FIRST_MEASURE_RATIO = 1.35
+const OTHER_MEASURE_RATIO = (MEASURES_PER_SYSTEM - FIRST_MEASURE_RATIO) / (MEASURES_PER_SYSTEM - 1)
 const SCORE_MARGIN = 34
 const CLEF_BOTTOM_NOTE: Record<string, { index: number; octave: number }> = {
   treble: { index: 2, octave: 4 }, bass: { index: 6, octave: 2 },
@@ -80,6 +84,7 @@ function App() {
   const [showEcosystemMap, setShowEcosystemMap] = useState(false)
   const [activeTool, setActiveTool] = useState<'file' | 'layout' | 'notes' | 'score' | 'playback' | 'edit' | 'write' | null>(null)
   const [duration, setDuration] = useState<Duration>('q')
+  const [handwritingStrokes, setHandwritingStrokes] = useState<InkStroke[]>([])
   const [dotted, setDotted] = useState(false)
   const [rest, setRest] = useState(false)
   const [accidental, setAccidental] = useState<NoteItem['accidental']>('')
@@ -108,8 +113,8 @@ function App() {
   const backupInputRef = useRef<HTMLInputElement>(null)
   const scoreRef = useRef<HTMLDivElement>(null)
 
-  const measureCount = Math.max(4, ...notes.map(note => note.measure + 1))
-  const baseSystems = 4
+  const measureCount = Math.max(50, ...notes.map(note => note.measure + 1))
+  const baseSystems = 10
   const systems = Math.max(baseSystems, Math.ceil(measureCount / MEASURES_PER_SYSTEM))
   const stavesPerSystem = layout === 'grand' ? 2 : layout === 'orchestra' ? (importedStaffCount ?? 4) : 1
   const systemGap = layout === 'grand' ? GRAND_GAP : layout === 'orchestra' ? Math.max(SYSTEM_GAP, (stavesPerSystem - 1) * STAFF_GROUP_GAP + STAFF_HEIGHT + 26) : SYSTEM_GAP
@@ -239,6 +244,25 @@ function App() {
   }, [notes])
 
   useEffect(() => {
+    const canvas = handwritingCanvasRef.current
+    if (!canvas || activeTool !== 'write') return
+    const context = canvas.getContext('2d')
+    if (!context) return
+    context.clearRect(0, 0, canvas.width, canvas.height)
+    context.lineWidth = 3
+    context.lineCap = 'round'
+    context.lineJoin = 'round'
+    context.strokeStyle = '#29251f'
+    handwritingStrokes.forEach(stroke => {
+      if (!stroke.length) return
+      context.beginPath()
+      context.moveTo(stroke[0].x, stroke[0].y)
+      stroke.slice(1).forEach(point => context.lineTo(point.x, point.y))
+      context.stroke()
+    })
+  }, [handwritingStrokes, activeTool])
+
+  useEffect(() => {
     const host = scoreRef.current
     if (!host) return
     host.innerHTML = ''
@@ -250,7 +274,7 @@ function App() {
       const context = renderer.getContext()
       const margin = SCORE_MARGIN
       const measureGap = 3
-      const measureWidth = (width - margin * 2) / MEASURES_PER_SYSTEM
+      const measureUnit = (width - margin * 2) / MEASURES_PER_SYSTEM
       for (let system = 0; system < systems; system++) {
         const baseY = SYSTEM_TOP + system * systemGap
         for (let part = 0; part < stavesPerSystem; part++) {
@@ -258,9 +282,11 @@ function App() {
           const y = baseY + part * STAFF_GROUP_GAP
           const activeClef = layout === 'grand' ? (part === 0 ? 'treble' : 'bass') : (layout === 'orchestra' && part > 0 ? 'bass' : clef)
           for (let bar = 0; bar < MEASURES_PER_SYSTEM; bar++) {
-            const x = margin + bar * measureWidth
+            const measureWidth = measureUnit * (bar === 0 ? FIRST_MEASURE_RATIO : OTHER_MEASURE_RATIO)
+            const x = margin + (bar === 0 ? 0 : measureUnit * FIRST_MEASURE_RATIO + (bar - 1) * measureUnit * OTHER_MEASURE_RATIO)
             const stave = new Stave(x, y, measureWidth - measureGap, { spacingBetweenLinesPx: STAFF_SPACING })
             if (bar === 0) {
+              stave.setBegBarType(Barline.type.NONE)
               stave.addClef(activeClef, 'small')
               stave.addTimeSignature(time)
               if (keySig !== 'C') stave.addKeySignature(keySig)
@@ -331,8 +357,11 @@ function App() {
     const name = DIATONIC[((pitchIndex % 7) + 7) % 7]
     const octave = bottom.octave + Math.floor(pitchIndex / 7)
     const key = name + '/' + octave
-    const measureWidth = (viewBox.width - SCORE_MARGIN * 2) / MEASURES_PER_SYSTEM
-    const measure = Math.max(0, Math.min(MEASURES_PER_SYSTEM - 1, Math.floor((x - SCORE_MARGIN) / measureWidth)))
+    const measureUnit = (viewBox.width - SCORE_MARGIN * 2) / MEASURES_PER_SYSTEM
+    const firstMeasureWidth = measureUnit * FIRST_MEASURE_RATIO
+    const measure = x < SCORE_MARGIN + firstMeasureWidth
+      ? 0
+      : Math.max(1, Math.min(MEASURES_PER_SYSTEM - 1, 1 + Math.floor((x - SCORE_MARGIN - firstMeasureWidth) / (measureUnit * OTHER_MEASURE_RATIO))))
     const measureIndex = system * MEASURES_PER_SYSTEM + measure
     const current = grouped.get(staffIndex + ':' + measureIndex) || []
     const beatLimit = ((Number(time.split('/')[0]) || 4) * 4) / (Number(time.split('/')[1]) || 4)
@@ -424,14 +453,14 @@ function App() {
         <nav className="tool-icon-list" aria-label="Nhóm công cụ">
           <button className={activeTool === 'file' ? 'tool-icon active' : 'tool-icon'} aria-label="Tác phẩm và nhập PDF" title="Tác phẩm và nhập PDF" onClick={() => setActiveTool(activeTool === 'file' ? null : 'file')}><span>▤</span></button>
           <button className={activeTool === 'layout' ? 'tool-icon active' : 'tool-icon'} aria-label="Bố cục khuông nhạc" title="Bố cục khuông nhạc" onClick={() => setActiveTool(activeTool === 'layout' ? null : 'layout')}><span>☷</span></button>
-          <button className={activeTool === 'notes' ? 'tool-icon active' : 'tool-icon'} aria-label="Nốt và ký hiệu" title="Nốt và ký hiệu" onClick={() => setActiveTool(activeTool === 'notes' ? null : 'notes')}><span>♬</span></button>
+          <button className={activeTool === 'notes' ? 'tool-icon active' : 'tool-icon'} aria-label="Nhập nốt thủ công" title="Nhập nốt thủ công" onClick={() => setActiveTool(activeTool === 'notes' ? null : 'notes')}><span>♬</span></button>
           <button className={activeTool === 'score' ? 'tool-icon active' : 'tool-icon'} aria-label="Khóa, nhịp và hóa biểu" title="Khóa, nhịp và hóa biểu" onClick={() => setActiveTool(activeTool === 'score' ? null : 'score')}><span>𝄞</span></button>
           <button className={activeTool === 'playback' ? 'tool-icon active' : 'tool-icon'} aria-label="Thiết lập phát nhạc" title="Thiết lập phát nhạc" onClick={() => setActiveTool(activeTool === 'playback' ? null : 'playback')}><span>♫</span></button>
           <button className={activeTool === 'edit' ? 'tool-icon active' : 'tool-icon'} aria-label="Chỉnh sửa" title="Chỉnh sửa" onClick={() => setActiveTool(activeTool === 'edit' ? null : 'edit')}><span>↶</span></button>
           <button className={activeTool === 'write' ? 'tool-icon active handwriting-tool' : 'tool-icon handwriting-tool'} aria-label="Viết tay và nhận dạng" title="Viết tay và nhận dạng" onClick={() => setActiveTool(activeTool === 'write' ? null : 'write')}><span>✍</span></button>
         </nav>
         {activeTool && <section className="tool-popover" aria-label="Bảng công cụ">
-          <div className="tool-popover-head"><strong>{({ file: 'Tác phẩm', layout: 'Bố cục khuông', notes: 'Nốt và ký hiệu', score: 'Thiết lập bản nhạc', playback: 'Phát nhạc', edit: 'Chỉnh sửa', write: 'Viết tay và nhận dạng' } as const)[activeTool]}</strong><button className="popover-close" aria-label="Đóng bảng công cụ" onClick={() => setActiveTool(null)}>×</button></div>
+          <div className="tool-popover-head"><strong>{({ file: 'Tác phẩm', layout: 'Bố cục khuông', notes: 'Nhập nốt thủ công', score: 'Thiết lập bản nhạc', playback: 'Phát nhạc', edit: 'Chỉnh sửa', write: 'Viết tay và nhận dạng' } as const)[activeTool]}</strong><button className="popover-close" aria-label="Đóng bảng công cụ" onClick={() => setActiveTool(null)}>×</button></div>
           {activeTool === 'file' && <>
             <label className="field-label" htmlFor="score-title">Tên tác phẩm</label><input id="score-title" className="title-input" value={title} onChange={e => setTitle(e.target.value)} />
             <div className="tool-divider-line" />
@@ -444,8 +473,9 @@ function App() {
             <p className="tool-help">{omrMessage}</p>{omrJobId && <small className="tool-help">Mã xử lý: {omrJobId}</small>}
             {sourceMusicXml && <><p className="tool-help">Bản MusicXML gốc được giữ riêng, không bị thay thế khi chỉnh sửa bản làm việc.</p><button className="tool-action" onClick={downloadOriginalMusicXml}><span>⇩</span>Tải MusicXML gốc</button></>}
           </>}
-          {activeTool === 'layout' && <div className="layout-options">{(['solo', 'large', 'grand', 'orchestra'] as Layout[]).map((item, index) => <button key={item} className={layout === item ? 'layout-choice selected' : 'layout-choice'} onClick={() => setLayout(item)}><span className="layout-icon">{['≋', '☰', '𝄞\n𝄢', '♬'][index]}</span><span><b>{['Solo', 'Khuông lớn', 'Đại khuông', 'Dàn nhạc'][index]}</b><small>{['10 khuông · Một bè', '6 khuông · Cỡ lớn', 'Sol + Fa · Piano', '4 bè · Phác thảo tổng phổ'][index]}</small></span></button>)}</div>}
+          {activeTool === 'layout' && <div className="layout-options">{(['solo', 'large', 'grand', 'orchestra'] as Layout[]).map((item, index) => <button key={item} className={layout === item ? 'layout-choice selected' : 'layout-choice'} onClick={() => setLayout(item)}><span className="layout-icon">{['≋', '☰', '𝄞\n𝄢', '♬'][index]}</span><span><b>{['Solo', 'Khuông lớn', 'Đại khuông', 'Dàn nhạc'][index]}</b><small>{['10 khuông · Một bè', '10 khuông · Cỡ lớn', 'Sol + Fa · Piano', '4 bè · Phác thảo tổng phổ'][index]}</small></span></button>)}</div>}
           {activeTool === 'notes' && <>
+            <p className="tool-help">Chọn trường độ, dấu hóa hoặc dấu nghỉ; sau đó chạm đúng vị trí trên khuông nhạc để đặt nốt. Nốt được lưu vào cùng bản nhạc và có thể hoàn tác.</p>
             <div className="field-label">Trường độ</div><div className="duration-grid">{DURATIONS.map(item => <button key={item.value} className={duration === item.value ? 'duration selected' : 'duration'} onClick={() => { setDuration(item.value); setRest(false) }}><span>{item.glyph}</span><small>{item.label}</small></button>)}</div>
             <div className="note-options"><button className={dotted ? 'mini-tool selected' : 'mini-tool'} onClick={() => setDotted(!dotted)}>·　Chấm dôi</button><button className={rest ? 'mini-tool selected' : 'mini-tool'} onClick={() => setRest(!rest)}>𝄽　Dấu nghỉ</button></div>
             <div className="tool-divider-line" /><div className="field-label">Dấu hóa</div><div className="accidental-grid">{([{ value: '', label: 'Không' }, { value: '#', label: 'Thăng \uE262' }, { value: 'b', label: 'Giáng \uE260' }, { value: 'n', label: 'Bình \uE261' }] as const).map(item => <button key={item.value || 'none'} className={accidental === item.value ? 'mini-tool selected' : 'mini-tool'} onClick={() => setAccidental(item.value)}>{item.label}</button>)}</div>
@@ -461,20 +491,21 @@ function App() {
             <p className="tool-help">Thiết lập tempo và cường độ hiển thị trên bản nhạc. Bộ phát âm thanh chưa được kết nối trong phiên bản này.</p>
           </>}
           {activeTool === 'write' && <div className="handwriting-panel">
-            <p className="tool-help">Viết ký hiệu bằng Apple Pencil hoặc bút cảm ứng trong vùng bên dưới. Nét viết hiện được giữ trong phiên làm việc này.</p>
+            <p className="tool-help">Viết trực tiếp bằng Apple Pencil hoặc bút cảm ứng. Nét viết được giữ khi đóng/mở bảng công cụ trong phiên làm việc; bước nhận dạng thành nốt nhạc sẽ được kết nối ở giai đoạn tiếp theo.</p>
             <canvas ref={handwritingCanvasRef} className="handwriting-canvas" width={720} height={260}
-              onPointerDown={event => { const canvas = event.currentTarget; const rect = canvas.getBoundingClientRect(); const x = (event.clientX - rect.left) * canvas.width / rect.width; const y = (event.clientY - rect.top) * canvas.height / rect.height; const ctx = canvas.getContext('2d'); if (!ctx) return; inkPointerRef.current = event.pointerId; canvas.setPointerCapture(event.pointerId); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#29251f' }}
-              onPointerMove={event => { if (inkPointerRef.current !== event.pointerId) return; const canvas = event.currentTarget; const rect = canvas.getBoundingClientRect(); const x = (event.clientX - rect.left) * canvas.width / rect.width; const y = (event.clientY - rect.top) * canvas.height / rect.height; const ctx = canvas.getContext('2d'); if (!ctx) return; ctx.lineTo(x, y); ctx.stroke() }}
+              onPointerDown={event => { const canvas = event.currentTarget; const rect = canvas.getBoundingClientRect(); const point = { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height }; inkPointerRef.current = event.pointerId; canvas.setPointerCapture(event.pointerId); setHandwritingStrokes(prev => [...prev, [point]]) }}
+              onPointerMove={event => { if (inkPointerRef.current !== event.pointerId) return; const canvas = event.currentTarget; const rect = canvas.getBoundingClientRect(); const point = { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height }; setHandwritingStrokes(prev => { if (!prev.length) return prev; const next = prev.slice(); next[next.length - 1] = [...next[next.length - 1], point]; return next }) }}
               onPointerUp={event => { if (inkPointerRef.current === event.pointerId) inkPointerRef.current = null }}
               onPointerCancel={event => { if (inkPointerRef.current === event.pointerId) inkPointerRef.current = null }} />
-            <button className="tool-action" onClick={() => { const canvas = handwritingCanvasRef.current; canvas?.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height) }}><span>⌫</span>Xóa nét viết</button>
-            <p className="tool-help handwriting-notice">Bộ nhận dạng chữ viết nhạc của MeloLegacy chưa được kết nối. Nút này đã mở vùng viết tay; chưa tự chuyển nét viết thành MusicXML hoặc nốt nhạc.</p>
+            <button className="tool-action" onClick={() => setHandwritingStrokes(prev => prev.slice(0, -1))} disabled={!handwritingStrokes.length}><span>↶</span>Hoàn tác nét viết</button>
+            <button className="tool-action" onClick={() => setHandwritingStrokes([])} disabled={!handwritingStrokes.length}><span>⌫</span>Xóa toàn bộ nét</button>
+            <p className="tool-help handwriting-notice">Nhận dạng tự động chưa được kết nối. Nét viết hiện được giữ trong phiên làm việc, chưa chuyển thành ký hiệu hoặc MusicXML.</p>
           </div>}
           {activeTool === 'edit' && <div className="edit-tools"><button className="tool-action" onClick={undo} disabled={!history.length}><span>↶</span>Hoàn tác</button><button className="tool-action" onClick={redo} disabled={!future.length}><span>↷</span>Làm lại</button><button className="tool-action danger" onClick={clearScore}><span>⌫</span>Xóa bản nhạc</button><button className="tool-action" onClick={() => window.print()}><span>⤓</span>Xuất / In PDF</button></div>}
         </section>}
       </aside>
       <section className="score-area">
-        <div className="score-toolbar"><div><span className="crumb">MeloLegacy</span><span className="slash">/</span><b>Phòng Soạn Nhạc</b></div><div className="zoom-label">A4 · Dọc · {systems} hệ thống · 3 ô nhịp / hệ</div></div>
+        <div className="score-toolbar"><div><span className="crumb">MeloLegacy</span><span className="slash">/</span><b>Phòng Soạn Nhạc</b></div><div className="zoom-label">A4 · Dọc · {systems} hệ thống · 5 ô nhịp / hệ</div></div>
         <div className="paper-wrap"><div className="paper" style={{ minHeight: paperHeight }}>
           <div className="paper-head"><div className="paper-kicker">MELOLEGACY · MUSIC COMPOSITION</div><h1>{title || 'Tác phẩm mới'}</h1><div className="paper-meta"><span>Tác giả: __________________</span><span>♩ = {tempo}　{dynamic}</span></div></div>
           <div className="notation-host" ref={scoreRef} onClick={addFromCanvas} style={{ minHeight: paperHeight - 180 }} />
