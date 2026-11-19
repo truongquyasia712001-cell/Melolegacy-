@@ -28,6 +28,7 @@ export default function App() {
   const [timeBottom, setTimeBottom] = useState(4)
   const [wheelRotation, setWheelRotation] = useState(0)
   const wheelDragRef = useRef<{ startAngle: number; startRotation: number; moved: boolean } | null>(null)
+  const wheelSuppressClickRef = useRef(false)
   const timerRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -154,7 +155,7 @@ export default function App() {
           if (!drag) return
           const rect = event.currentTarget.getBoundingClientRect()
           const angle = Math.atan2(event.clientY - rect.top - rect.height / 2, event.clientX - rect.left - rect.width / 2) * 180 / Math.PI
-          const delta = angle - drag.startAngle
+          const delta = ((angle - drag.startAngle + 540) % 360) - 180
           if (Math.abs(delta) > 4) drag.moved = true
           if (drag.moved) setWheelRotation(drag.startRotation + delta)
         }}
@@ -162,6 +163,7 @@ export default function App() {
           const drag = wheelDragRef.current
           wheelDragRef.current = null
           if (!drag?.moved) return
+          wheelSuppressClickRef.current = true
           const snapped = Math.round(wheelRotation / 30) * 30
           setWheelRotation(snapped)
           const index = ((-Math.round(snapped / 30)) % 12 + 12) % 12
@@ -171,7 +173,7 @@ export default function App() {
         onPointerCancel={() => { wheelDragRef.current = null }}>
         {FIFTHS.map((key, index) => {
           const angle = (index * 30 + wheelRotation - 90) * Math.PI / 180
-          return <button key={key} style={{ left: `${50 + Math.cos(angle) * 39}%`, top: `${50 + Math.sin(angle) * 39}%` }} onClick={() => { if (!wheelDragRef.current?.moved) { setNativeSelect('key', key); setPopup(null) } }}><b>{key}</b><small>{KEY_LABELS[key]}</small></button>
+          return <button key={key} style={{ left: `${50 + Math.cos(angle) * 39}%`, top: `${50 + Math.sin(angle) * 39}%` }} onClick={() => { if (wheelSuppressClickRef.current) { wheelSuppressClickRef.current = false; return } setNativeSelect('key', key); setPopup(null) }}><b>{key}</b><small>{KEY_LABELS[key]}</small></button>
         })}
         <div className="fifths-center"><b>{FIFTHS[((-Math.round(wheelRotation / 30)) % 12 + 12) % 12]}</b><span>Quãng năm</span></div>
       </div>}
