@@ -17,7 +17,8 @@ const SYMBOL_GROUPS = [
  {id:'text',name:'Chữ & chỉ dẫn',items:[['♩=','Tempo'],['pizz.','Pizzicato'],['arco','Arco'],['sim.','Simile'],['rit.','Ritardando'],['accel.','Accelerando']]},
  {id:'percussion',name:'Bộ gõ & nhạc cụ',items:[['𝄥','Khóa bộ gõ'],['x','Đầu nốt bộ gõ'],['○','Đầu nốt mở'],['+','Đầu nốt đóng']]},
 ] as const
-\nconst CLEFS = [
+
+const CLEFS = [
   { value: 'treble', label: 'Sol', symbol: '𝄞' },
   { value: 'bass', label: 'Fa', symbol: '𝄢' },
   { value: 'alto', label: 'Đô Alto', symbol: '𝄡' },
@@ -35,7 +36,13 @@ function setNativeSelect(id: string, value: string) {
 }
 
 export default function App() {
-  const [popup, setPopup] = useState<Popup>(null)\n  const [libraryOpen, setLibraryOpen] = useState(false)\n  const [activeGroup, setActiveGroup] = useState('notes')\n  const [dock, setDock] = useState<'top'|'bottom'|'left'|'right'>('bottom')\n  const [palettePoint, setPalettePoint] = useState<{x:number;y:number}|null>(null)\n  const [selectedSymbol, setSelectedSymbol] = useState('')\n  const [paletteDrag, setPaletteDrag] = useState<{x:number;y:number;left:number;top:number}|null>(null)
+  const [popup, setPopup] = useState<Popup>(null)
+  const [libraryOpen, setLibraryOpen] = useState(false)
+  const [activeGroup, setActiveGroup] = useState('notes')
+  const [dock, setDock] = useState<'top'|'bottom'|'left'|'right'>('bottom')
+  const [palettePoint, setPalettePoint] = useState<{x:number;y:number}|null>(null)
+  const [selectedSymbol, setSelectedSymbol] = useState('')
+  const [paletteDrag, setPaletteDrag] = useState<{x:number;y:number;left:number;top:number}|null>(null)
   const [penMode, setPenMode] = useState(false)
   const [strokes, setStrokes] = useState<string[]>([])
   const [activeStroke, setActiveStroke] = useState('')
