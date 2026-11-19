@@ -4,3 +4,31 @@
 .map-toggle-button{border:1px solid #d8c49c;background:#fbf7ee;color:#795d2d;border-radius:7px;padding:8px 12px;font-size:11px;cursor:pointer}.map-toggle-button:hover{background:#f3ead8}@media(max-width:760px){.map-toggle-button{padding:7px 9px;font-size:10px}}
 
 .melo-map-loading{min-height:70vh;display:grid;place-items:center;color:#8b6c35;font:16px Georgia,serif;background:#f1eee8}
+
+/* Compact icon-first composer tool dock */
+.workspace{grid-template-columns:68px minmax(0,1fr)}
+.tool-rail{position:relative;z-index:4;background:#fff;border-right:1px solid #e8e1d5;padding:14px 9px;display:flex;align-items:flex-start;justify-content:center}
+.tool-icon-list{display:flex;flex-direction:column;gap:9px;position:sticky;top:82px}
+.tool-icon{width:46px;height:46px;border:1px solid #eee7db;border-radius:12px;background:#fff;color:#8d7040;display:grid;place-items:center;font-size:23px;box-shadow:0 2px 7px #66563a0a;transition:background .15s,border-color .15s}
+.tool-icon:hover,.tool-icon.active{background:#faf5e9;border-color:#b99454;color:#765827}
+.tool-popover{position:fixed;left:78px;top:82px;width:286px;max-height:calc(100vh - 104px);overflow:auto;background:#fff;border:1px solid #e8dfcf;border-radius:14px;box-shadow:0 16px 44px #34281624;padding:16px;display:flex;flex-direction:column;gap:10px;z-index:20}
+.tool-popover-head{display:flex;align-items:center;justify-content:space-between;padding-bottom:9px;border-bottom:1px solid #eee8dc;color:#4b3d29}
+.tool-popover-head strong{font:600 15px Georgia,serif}
+.popover-close{border:0;background:#f5f1e9;border-radius:50%;width:28px;height:28px;color:#76664c;font-size:19px}
+.tool-divider-line{height:1px;background:#f0ece5;margin:3px 0}
+.tool-action{display:flex;align-items:center;gap:10px;width:100%;border:1px solid #e9e1d4;border-radius:8px;padding:10px 11px;background:#fff;color:#544936;text-align:left;font-size:12px}
+.tool-action span{font-size:18px;color:#9b793e;width:22px;text-align:center}
+.tool-action.primary{background:#a9823e;border-color:#a9823e;color:#fff;justify-content:center}
+.tool-action.primary span{color:#fff}
+.tool-action:disabled{opacity:.45;cursor:not-allowed}
+.tool-action.danger{color:#9b4f43}
+.tool-help{font-size:10px;line-height:1.55;color:#918879;margin:0}
+.edit-tools{display:grid;gap:7px}
+.visually-hidden-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+@media(max-width:760px){
+ .workspace{grid-template-columns:1fr}
+ .tool-rail{order:2;border-right:0;border-top:1px solid #e8e1d5;padding:10px 8px;display:block}
+ .tool-icon-list{position:static;flex-direction:row;justify-content:space-around;gap:6px}
+ .tool-icon{width:42px;height:42px}
+ .tool-popover{left:8px;right:8px;bottom:70px;top:auto;width:auto;max-height:min(65vh,560px)}
+}
