@@ -294,7 +294,7 @@ function App() {
       <div className="brand"><div className="brand-mark">M</div><div><strong>MeloLegacy</strong><span>{showEcosystemMap ? 'BẢN ĐỒ HỆ SINH THÁI 3D' : 'PHÒNG SOẠN NHẠC'}</span></div></div>
       <div className="top-actions"><button className="map-toggle-button" onClick={() => setShowEcosystemMap(value => !value)}>{showEcosystemMap ? 'Phòng Soạn Nhạc' : 'Sơ đồ 3D'}</button><span className="save-state"><i />{status}</span><button className="gold-button" onClick={() => window.print()}>Xuất PDF</button></div>
     </header>
-    {showEcosystemMap ? <MeloEcosystem3D onClose={() => setShowEcosystemMap(false)} /> : <section className="workspace">
+    {showEcosystemMap ? <MeloEcosystem3D onClose={() => setShowEcosystemMap(false)} /> : <><section className="workspace">
       <aside className="tool-panel">
         <div className="panel-heading">TÁC PHẨM</div>
         <label className="field-label" htmlFor="score-title">Tên tác phẩm</label>
