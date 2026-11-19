@@ -1,0 +1,36 @@
+name: MeloLegacy web and iPad browser QA
+
+on:
+  pull_request:
+    branches: [main, feature/audiveris-omr-pdf]
+  push:
+    branches: [feature/audiveris-omr-pdf, feature/melolegacy-3d-ecosystem-map, feature/omr-piano-reading-playback]
+  workflow_dispatch:
+
+jobs:
+  ipad-browser-qa:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: melolegacy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: melolegacy/package-lock.json
+      - run: npm install
+      - run: npm install --no-save @playwright/test
+      - run: npx playwright install --with-deps webkit chromium
+      - run: npm run build
+      - run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: melolegacy-ipad-browser-qa
+          path: |
+            melolegacy/playwright-report/
+            melolegacy/test-results/
+          if-no-files-found: ignore
+          retention-days: 14

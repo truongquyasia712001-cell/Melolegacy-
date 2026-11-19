@@ -2,9 +2,9 @@ name: Validate MeloLegacy PDF OMR integration
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feature/audiveris-omr-pdf]
   push:
-    branches: [feature/audiveris-omr-pdf]
+    branches: [feature/audiveris-omr-pdf, feature/melolegacy-3d-ecosystem-map, feature/omr-piano-reading-playback]
 
 jobs:
   web-build:
