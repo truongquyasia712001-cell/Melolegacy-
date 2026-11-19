@@ -73,6 +73,7 @@ function makeVexNote(item: NoteItem, clef: string) {
 function App() {
   const [layout, setLayout] = useState<Layout>('solo')
   const [showEcosystemMap, setShowEcosystemMap] = useState(false)
+  const [activeTool, setActiveTool] = useState<'file' | 'layout' | 'notes' | 'score' | 'playback' | 'edit' | null>(null)
   const [duration, setDuration] = useState<Duration>('q')
   const [dotted, setDotted] = useState(false)
   const [rest, setRest] = useState(false)
@@ -296,34 +297,42 @@ function App() {
       <div className="top-actions"><button className="map-toggle-button" onClick={() => setShowEcosystemMap(value => !value)}>{showEcosystemMap ? 'Phòng Soạn Nhạc' : 'Sơ đồ 3D'}</button><span className="save-state"><i />{status}</span><button className="gold-button" onClick={() => window.print()}>Xuất PDF</button></div>
     </header>
     {showEcosystemMap ? <Suspense fallback={<div className="melo-map-loading">Đang mở sơ đồ 3D…</div>}><MeloEcosystem3D onClose={() => setShowEcosystemMap(false)} /></Suspense> : <><section className="workspace">
-      <aside className="tool-panel">
-        <div className="panel-heading">TÁC PHẨM</div>
-        <label className="field-label" htmlFor="score-title">Tên tác phẩm</label>
-        <input id="score-title" className="title-input" value={title} onChange={e => setTitle(e.target.value)} />
-        <div className="panel-heading">BỐ CỤC KHUÔNG NHẠC</div>
-        <div className="layout-options">
-          {(['solo', 'large', 'grand', 'orchestra'] as Layout[]).map((item, index) => <button key={item} className={layout === item ? 'layout-choice selected' : 'layout-choice'} onClick={() => setLayout(item)}><span className="layout-icon">{['≋', '☰', '𝄞\n𝄢', '♬'][index]}</span><span><b>{['Solo', 'Khuông lớn', 'Đại khuông', 'Dàn nhạc'][index]}</b><small>{['10 khuông · Một bè', '6 khuông · Cỡ lớn', 'Sol + Fa · Piano', '4 bè · Phác thảo tổng phổ'][index]}</small></span></button>)}
-        </div>
-        <div className="panel-heading">TRƯỜNG ĐỘ · KÝ HIỆU CHUẨN</div>
-        <div className="duration-grid">
-          {DURATIONS.map(item => <button key={item.value} className={duration === item.value ? 'duration selected' : 'duration'} onClick={() => { setDuration(item.value); setRest(false) }}><span>{item.glyph}</span><small>{item.label}</small></button>)}
-        </div>
-        <div className="note-options">
-          <button className={dotted ? 'mini-tool selected' : 'mini-tool'} onClick={() => setDotted(!dotted)}>·　Chấm dôi</button>
-          <button className={rest ? 'mini-tool selected' : 'mini-tool'} onClick={() => setRest(!rest)}>𝄽　Dấu nghỉ</button>
-        </div>
-        <div className="panel-heading">DẤU HÓA</div>
-        <div className="accidental-grid">{([{ value: '', label: 'Không' }, { value: '#', label: 'Thăng ♯' }, { value: 'b', label: 'Giáng ♭' }, { value: 'n', label: 'Bình ♮' }] as const).map(item => <button key={item.value || 'none'} className={accidental === item.value ? 'mini-tool selected' : 'mini-tool'} onClick={() => setAccidental(item.value)}>{item.label}</button>)}</div>
-        <div className="panel-heading">KHÓA · NHỊP · HÓA BIỂU</div>
-        <label className="field-label" htmlFor="clef">Khóa nhạc</label><select id="clef" className="title-input" value={clef} onChange={e => setClef(e.target.value as typeof clef)}><option value="treble">Khóa Sol</option><option value="bass">Khóa Fa</option><option value="alto">Khóa Đô (Alto)</option><option value="tenor">Khóa Đô (Tenor)</option></select>
-        <div className="setting-row"><label className="field-label" htmlFor="time">Nhịp</label><select id="time" value={time} onChange={e => setTime(e.target.value)}><option>4/4</option><option>3/4</option><option>2/4</option><option>6/8</option><option>9/8</option><option>12/8</option></select></div>
-        <div className="setting-row"><label className="field-label" htmlFor="key">Hóa biểu</label><select id="key" value={keySig} onChange={e => setKeySig(e.target.value)}>{['C','G','D','A','E','B','F','Bb','Eb','Ab','Db','Gb'].map(k => <option key={k}>{k}</option>)}</select></div>
-        <div className="panel-heading">ÂM NHẠC · PHÁT LẠI</div>
-        <div className="setting-row"><label className="field-label" htmlFor="tempo">Tempo ♩</label><input id="tempo" type="number" min="20" max="300" value={tempo} onChange={e => setTempo(Number(e.target.value))}/></div>
-        <div className="setting-row"><label className="field-label" htmlFor="dynamic">Cường độ</label><select id="dynamic" value={dynamic} onChange={e => setDynamic(e.target.value)}>{['pp','p','mp','mf','f','ff'].map(v => <option key={v}>{v}</option>)}</select></div>
-        <div className="action-stack"><button onClick={undo} disabled={!history.length}>↶　Hoàn tác</button><button onClick={redo} disabled={!future.length}>↷　Làm lại</button><button onClick={clearScore}>⌫　Xóa bản nhạc</button></div>
-        <p className="hint">Chọn trường độ và chạm đúng vị trí trên khuông để ghi nốt. Các nốt được khắc bằng bộ máy ký âm VexFlow.</p>
-        <div className="panel-foot">Bản nhạc lưu cục bộ trên thiết bị này.</div>
+      <aside className="tool-rail" aria-label="Công cụ Phòng Soạn Nhạc">
+        <nav className="tool-icon-list" aria-label="Nhóm công cụ">
+          <button className={activeTool === 'file' ? 'tool-icon active' : 'tool-icon'} aria-label="Tác phẩm và nhập PDF" title="Tác phẩm và nhập PDF" onClick={() => setActiveTool(activeTool === 'file' ? null : 'file')}><span>▤</span></button>
+          <button className={activeTool === 'layout' ? 'tool-icon active' : 'tool-icon'} aria-label="Bố cục khuông nhạc" title="Bố cục khuông nhạc" onClick={() => setActiveTool(activeTool === 'layout' ? null : 'layout')}><span>☷</span></button>
+          <button className={activeTool === 'notes' ? 'tool-icon active' : 'tool-icon'} aria-label="Nốt và ký hiệu" title="Nốt và ký hiệu" onClick={() => setActiveTool(activeTool === 'notes' ? null : 'notes')}><span>♬</span></button>
+          <button className={activeTool === 'score' ? 'tool-icon active' : 'tool-icon'} aria-label="Khóa, nhịp và hóa biểu" title="Khóa, nhịp và hóa biểu" onClick={() => setActiveTool(activeTool === 'score' ? null : 'score')}><span>𝄞</span></button>
+          <button className={activeTool === 'playback' ? 'tool-icon active' : 'tool-icon'} aria-label="Thiết lập phát nhạc" title="Thiết lập phát nhạc" onClick={() => setActiveTool(activeTool === 'playback' ? null : 'playback')}><span>♫</span></button>
+          <button className={activeTool === 'edit' ? 'tool-icon active' : 'tool-icon'} aria-label="Chỉnh sửa" title="Chỉnh sửa" onClick={() => setActiveTool(activeTool === 'edit' ? null : 'edit')}><span>↶</span></button>
+        </nav>
+        {activeTool && <section className="tool-popover" aria-label="Bảng công cụ">
+          <div className="tool-popover-head"><strong>{({ file: 'Tác phẩm', layout: 'Bố cục khuông', notes: 'Nốt và ký hiệu', score: 'Thiết lập bản nhạc', playback: 'Phát nhạc', edit: 'Chỉnh sửa' } as const)[activeTool]}</strong><button className="popover-close" aria-label="Đóng bảng công cụ" onClick={() => setActiveTool(null)}>×</button></div>
+          {activeTool === 'file' && <>
+            <label className="field-label" htmlFor="score-title">Tên tác phẩm</label><input id="score-title" className="title-input" value={title} onChange={e => setTitle(e.target.value)} />
+            <div className="tool-divider-line" />
+            <input ref={pdfInputRef} className="visually-hidden-input" type="file" accept="application/pdf,.pdf" disabled={omrBusy} onChange={event => recognizePdf(event.target.files?.[0])} />
+            <button className="tool-action primary" disabled={omrBusy} onClick={() => pdfInputRef.current?.click()}><span>⇧</span>{omrBusy ? 'Đang nhận dạng PDF…' : 'Nhập PDF và nhận dạng'}</button>
+            <p className="tool-help">{omrMessage}</p>{omrJobId && <small className="tool-help">Mã xử lý: {omrJobId}</small>}
+          </>}
+          {activeTool === 'layout' && <div className="layout-options">{(['solo', 'large', 'grand', 'orchestra'] as Layout[]).map((item, index) => <button key={item} className={layout === item ? 'layout-choice selected' : 'layout-choice'} onClick={() => setLayout(item)}><span className="layout-icon">{['≋', '☰', '𝄞\n𝄢', '♬'][index]}</span><span><b>{['Solo', 'Khuông lớn', 'Đại khuông', 'Dàn nhạc'][index]}</b><small>{['10 khuông · Một bè', '6 khuông · Cỡ lớn', 'Sol + Fa · Piano', '4 bè · Phác thảo tổng phổ'][index]}</small></span></button>)}</div>}
+          {activeTool === 'notes' && <>
+            <div className="field-label">Trường độ</div><div className="duration-grid">{DURATIONS.map(item => <button key={item.value} className={duration === item.value ? 'duration selected' : 'duration'} onClick={() => { setDuration(item.value); setRest(false) }}><span>{item.glyph}</span><small>{item.label}</small></button>)}</div>
+            <div className="note-options"><button className={dotted ? 'mini-tool selected' : 'mini-tool'} onClick={() => setDotted(!dotted)}>·　Chấm dôi</button><button className={rest ? 'mini-tool selected' : 'mini-tool'} onClick={() => setRest(!rest)}>𝄽　Dấu nghỉ</button></div>
+            <div className="tool-divider-line" /><div className="field-label">Dấu hóa</div><div className="accidental-grid">{([{ value: '', label: 'Không' }, { value: '#', label: 'Thăng ♯' }, { value: 'b', label: 'Giáng ♭' }, { value: 'n', label: 'Bình ♮' }] as const).map(item => <button key={item.value || 'none'} className={accidental === item.value ? 'mini-tool selected' : 'mini-tool'} onClick={() => setAccidental(item.value)}>{item.label}</button>)}</div>
+          </>}
+          {activeTool === 'score' && <>
+            <label className="field-label" htmlFor="clef">Khóa nhạc</label><select id="clef" className="title-input" value={clef} onChange={e => setClef(e.target.value as typeof clef)}><option value="treble">Khóa Sol</option><option value="bass">Khóa Fa</option><option value="alto">Khóa Đô (Alto)</option><option value="tenor">Khóa Đô (Tenor)</option></select>
+            <div className="setting-row"><label className="field-label" htmlFor="time">Nhịp</label><select id="time" value={time} onChange={e => setTime(e.target.value)}><option>4/4</option><option>3/4</option><option>2/4</option><option>6/8</option><option>9/8</option><option>12/8</option></select></div>
+            <div className="setting-row"><label className="field-label" htmlFor="key">Hóa biểu</label><select id="key" value={keySig} onChange={e => setKeySig(e.target.value)}>{['C','G','D','A','E','B','F','Bb','Eb','Ab','Db','Gb'].map(k => <option key={k}>{k}</option>)}</select></div>
+          </>}
+          {activeTool === 'playback' && <>
+            <div className="setting-row"><label className="field-label" htmlFor="tempo">Tempo ♩</label><input id="tempo" type="number" min="20" max="300" value={tempo} onChange={e => setTempo(Math.max(20, Math.min(300, Number(e.target.value) || 80)))}/></div>
+            <div className="setting-row"><label className="field-label" htmlFor="dynamic">Cường độ</label><select id="dynamic" value={dynamic} onChange={e => setDynamic(e.target.value)}>{['pp','p','mp','mf','f','ff'].map(v => <option key={v}>{v}</option>)}</select></div>
+            <p className="tool-help">Thiết lập tempo và cường độ hiển thị trên bản nhạc. Bộ phát âm thanh chưa được kết nối trong phiên bản này.</p>
+          </>}
+          {activeTool === 'edit' && <div className="edit-tools"><button className="tool-action" onClick={undo} disabled={!history.length}><span>↶</span>Hoàn tác</button><button className="tool-action" onClick={redo} disabled={!future.length}><span>↷</span>Làm lại</button><button className="tool-action danger" onClick={clearScore}><span>⌫</span>Xóa bản nhạc</button><button className="tool-action" onClick={() => window.print()}><span>⤓</span>Xuất / In PDF</button></div>}
+        </section>}
       </aside>
       <section className="score-area">
         <div className="omr-panel">
