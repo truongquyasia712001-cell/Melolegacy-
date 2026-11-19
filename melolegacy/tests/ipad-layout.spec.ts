@@ -152,3 +152,14 @@ test('piano recording import extracts and stores chromatic samples locally', asy
   await page.getByRole('button', { name: 'Lưu bộ sample trên thiết bị' }).click()
   await expect(page.getByRole('status')).toContainText('Đã lưu 3 sample piano')
 })
+
+
+test('Meta Piano samples are bundled locally for offline composer playback', async ({ page, request }) => {
+  await page.goto('/')
+  await expect(page.getByRole('button', { name: 'Tải piano Meta · 88 phím' })).toBeVisible()
+  const sample = await request.get('/audio/meta-piano/INSPiano_Vel03_C4_01.ogg', { timeout: 30000 })
+  expect(sample.ok()).toBeTruthy()
+  const bytes = await sample.body()
+  expect(bytes.subarray(0, 4).toString()).toBe('OggS')
+  await expect(page.getByText(/đang nạp lớp lực đánh mf/)).toBeVisible()
+})
