@@ -17,7 +17,7 @@ test('Neuron room selection and branch expansion work with touch-sized controls'
   await expect(page.getByRole('button', { name: /Nhận dạng PDF/ })).toHaveCount(0)
   await page.getByRole('button', { name: 'Mở rộng +' }).click()
   await expect(page.getByRole('button', { name: /Nhận dạng PDF/ })).toBeVisible()
-  await page.getByRole('button', { name: /Phòng Thu Âm/ }).click()
+  await page.getByRole('button', { name: /Thu Âm/ }).click()
   await expect(page.getByRole('heading', { name: 'Phòng Thu Âm' })).toBeVisible()
   await expect(page.getByRole('button', { name: /Thu âm/ })).toBeVisible()
 })
