@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Accidental, Beam, Formatter, Renderer, Stave, StaveNote, Voice } from 'vexflow'
 import './App.css'
+import { PianoSampleBank } from './PianoSampleBank'
+import { loadPianoSampleBank, midiFromPitch, playPianoSample, type PianoSample } from './pianoSamples'
 
 type Duration = 'w' | 'h' | 'q' | '8' | '16' | '32'
 type NoteItem = { id: number; staff: number; measure: number; beat?: number; key: string; duration: Duration; dotted: boolean; accidental: '' | '#' | 'b' | 'n'; rest: boolean }
@@ -103,6 +105,8 @@ function App() {
   const [activeNoteIds, setActiveNoteIds] = useState<number[]>([])
   const audioContextRef = useRef<AudioContext | null>(null)
   const playbackRunRef = useRef(0)
+  const pianoSamplesRef = useRef<PianoSample[]>([])
+  const [pianoSampleCount, setPianoSampleCount] = useState(0)
   const [omrBusy, setOmrBusy] = useState(false)
   const [omrMessage, setOmrMessage] = useState('Chọn tệp PDF để nhận dạng bản nhạc.')
   const [omrJobId, setOmrJobId] = useState('')
@@ -116,6 +120,10 @@ function App() {
   const stavesPerSystem = layout === 'grand' ? 2 : layout === 'orchestra' ? (importedStaffCount ?? 4) : 1
   const systemGap = layout === 'grand' ? GRAND_GAP : layout === 'orchestra' ? Math.max(SYSTEM_GAP, (stavesPerSystem - 1) * 68 + STAFF_HEIGHT + 30) : SYSTEM_GAP
   const paperHeight = Math.max(1123, 190 + systems * systemGap)
+
+  useEffect(() => {
+    loadPianoSampleBank().then(samples => { pianoSamplesRef.current = samples; setPianoSampleCount(samples.length) }).catch(error => console.warn('Piano sample bank unavailable', error))
+  }, [])
 
   useEffect(() => {
     localStorage.setItem('melo-composer-notes-v2', JSON.stringify(notes))
@@ -207,9 +215,13 @@ function App() {
     const AudioContextClass = window.AudioContext
     if (!AudioContextClass) return
     const context = audioContextRef.current || (audioContextRef.current = new AudioContextClass())
-    const [letter = 'c', octaveText = '4'] = key.split('/')
-    const semitones: Record<string, number> = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 }
-    const midi = (Number(octaveText) + 1) * 12 + (semitones[letter.toLowerCase()] ?? 0) + (accidentalValue === '#' ? 1 : accidentalValue === 'b' ? -1 : 0)
+    const midi = midiFromPitch(key, accidentalValue)
+    const nearestSample = pianoSamplesRef.current.reduce<PianoSample | null>((best, sample) =>
+      !best || Math.abs(sample.midi - midi) < Math.abs(best.midi - midi) ? sample : best, null)
+    if (nearestSample && Math.abs(nearestSample.midi - midi) <= 12) {
+      playPianoSample(context, nearestSample, midi, seconds)
+      return
+    }
     const frequency = 440 * Math.pow(2, (midi - 69) / 12)
     const master = context.createGain()
     master.gain.setValueAtTime(0.0001, context.currentTime)
@@ -415,7 +427,8 @@ function App() {
         <div className="setting-row"><label className="field-label" htmlFor="tempo">Tempo ♩</label><input id="tempo" type="number" min="20" max="300" value={tempo} onChange={e => setTempo(Number(e.target.value))}/></div>
         <div className="setting-row"><label className="field-label" htmlFor="playback-rate">Tốc độ đọc</label><select id="playback-rate" value={playbackRate} onChange={e => setPlaybackRate(Number(e.target.value))}><option value={0.5}>0,5× · Rất chậm</option><option value={0.75}>0,75× · Chậm</option><option value={1}>1× · Chuẩn</option><option value={1.25}>1,25× · Nhanh</option><option value={1.5}>1,5× · Rất nhanh</option></select></div>
         <button className="gold-button piano-play-button" onClick={togglePlayback} disabled={!notes.length}>{isPlaying ? 'Ⅱ　Dừng đọc' : '▶　Nghe piano & đọc nốt'}</button>
-        <p className="hint">Âm thanh piano mô phỏng bằng Web Audio. Nốt đang phát sẽ được tô sáng trên khuông nhạc.</p>
+        <p className="hint">{pianoSampleCount ? 'Đang dùng ' + pianoSampleCount + ' mẫu piano thu âm; nốt ngoài dải dùng mẫu gần nhất.' : 'Chưa có sample thu âm; hiện dùng tiếng piano mô phỏng.'} Nốt đang phát sẽ được tô sáng.</p>
+        <PianoSampleBank onSaved={samples => { pianoSamplesRef.current = samples; setPianoSampleCount(samples.length) }} />
         <div className="setting-row"><label className="field-label" htmlFor="dynamic">Cường độ</label><select id="dynamic" value={dynamic} onChange={e => setDynamic(e.target.value)}>{['pp','p','mp','mf','f','ff'].map(v => <option key={v}>{v}</option>)}</select></div>
         <div className="action-stack"><button onClick={undo} disabled={!history.length}>↶　Hoàn tác</button><button onClick={redo} disabled={!future.length}>↷　Làm lại</button><button onClick={clearScore}>⌫　Xóa bản nhạc</button></div>
         <p className="hint">Chọn trường độ và chạm đúng vị trí trên khuông để ghi nốt. Các nốt được khắc bằng bộ máy ký âm VexFlow.</p>
