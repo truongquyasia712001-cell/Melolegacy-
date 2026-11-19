@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { Accidental, Beam, Formatter, Renderer, Stave, StaveNote, Voice, loadFonts, setFonts } from 'vexflow'
+import { Accidental, Beam, Formatter, Renderer, Stave, StaveNote, Voice, VexFlow } from 'vexflow'
 import './App.css'
 import { loadLocalScore, saveLocalScore } from './localScoreStore'
 
@@ -116,9 +116,9 @@ function App() {
 
   useEffect(() => {
     let active = true
-    loadFonts('Bravura', 'Academico').then(() => {
+    VexFlow.loadFonts('Bravura', 'Academico').then(() => {
       if (!active) return
-      setFonts('Bravura', 'Academico')
+      VexFlow.setFonts('Bravura', 'Academico')
       setMusicFontReady(true)
     }).catch(() => {
       if (active) {
