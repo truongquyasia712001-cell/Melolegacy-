@@ -108,7 +108,7 @@ function App() {
   const scoreRef = useRef<HTMLDivElement>(null)
 
   const measureCount = Math.max(4, ...notes.map(note => note.measure + 1))
-  const baseSystems = layout === 'solo' ? 10 : layout === 'large' ? 6 : 5
+  const baseSystems = 4
   const systems = Math.max(baseSystems, Math.ceil(measureCount / MEASURES_PER_SYSTEM))
   const stavesPerSystem = layout === 'grand' ? 2 : layout === 'orchestra' ? (importedStaffCount ?? 4) : 1
   const systemGap = layout === 'grand' ? GRAND_GAP : layout === 'orchestra' ? Math.max(SYSTEM_GAP, (stavesPerSystem - 1) * STAFF_GROUP_GAP + STAFF_HEIGHT + 26) : SYSTEM_GAP
