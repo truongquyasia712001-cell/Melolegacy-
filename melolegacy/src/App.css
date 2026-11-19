@@ -44,3 +44,5 @@
 /* SMuFL Bravura music-font glyphs in the duration palette */
 .duration span{font-family:'Bravura',serif;font-size:27px;line-height:30px;font-variant-ligatures:none}
 .accidental-grid .mini-tool{font-family:'Bravura',Inter,sans-serif}
+
+.score-writing-layer{position:relative;width:100%;min-height:1px}.score-writing-layer .notation-host{position:relative;z-index:1}.score-ink-canvas{position:absolute;inset:0;z-index:2;display:block;touch-action:none;cursor:crosshair;background:transparent}.score-writing-layer.ink-active .score-ink-canvas{outline:2px solid #c7a66a;outline-offset:2px}.score-writing-layer.ink-active .notation-host{pointer-events:none}
