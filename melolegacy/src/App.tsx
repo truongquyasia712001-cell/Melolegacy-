@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Accidental, Beam, Formatter, Renderer, Stave, StaveNote, Voice } from 'vexflow'
-import { MeloEcosystem3D } from './MeloEcosystem3D'
 import './App.css'
 
 type Duration = 'w' | 'h' | 'q' | '8' | '16' | '32'
@@ -44,6 +43,8 @@ function parseMusicXml(xml: string): ImportedScore {
   const title = doc.querySelector('work > work-title')?.textContent || doc.querySelector('movement-title')?.textContent || 'Bản nhạc vừa nhận dạng'
   return { notes, partCount: parts.length, staffCount: staffOffset, title }
 }
+const MeloEcosystem3D = lazy(() => import('./MeloEcosystem3D').then(module => ({ default: module.MeloEcosystem3D })))
+
 const DURATIONS: { value: Duration; label: string; glyph: string }[] = [
   { value: 'w', label: 'Tròn', glyph: '𝅝' }, { value: 'h', label: 'Trắng', glyph: '𝅗𝅥' },
   { value: 'q', label: 'Đen', glyph: '♩' }, { value: '8', label: 'Móc đơn', glyph: '♪' },
@@ -294,7 +295,7 @@ function App() {
       <div className="brand"><div className="brand-mark">M</div><div><strong>MeloLegacy</strong><span>{showEcosystemMap ? 'BẢN ĐỒ HỆ SINH THÁI 3D' : 'PHÒNG SOẠN NHẠC'}</span></div></div>
       <div className="top-actions"><button className="map-toggle-button" onClick={() => setShowEcosystemMap(value => !value)}>{showEcosystemMap ? 'Phòng Soạn Nhạc' : 'Sơ đồ 3D'}</button><span className="save-state"><i />{status}</span><button className="gold-button" onClick={() => window.print()}>Xuất PDF</button></div>
     </header>
-    {showEcosystemMap ? <MeloEcosystem3D onClose={() => setShowEcosystemMap(false)} /> : <><section className="workspace">
+    {showEcosystemMap ? <Suspense fallback={<div className="melo-map-loading">Đang mở sơ đồ 3D…</div>}><MeloEcosystem3D onClose={() => setShowEcosystemMap(false)} /></Suspense> : <><section className="workspace">
       <aside className="tool-panel">
         <div className="panel-heading">TÁC PHẨM</div>
         <label className="field-label" htmlFor="score-title">Tên tác phẩm</label>
