@@ -47,9 +47,9 @@ function parseMusicXml(xml: string): ImportedScore {
 const MeloEcosystem3D = lazy(() => import('./MeloEcosystem3D').then(module => ({ default: module.MeloEcosystem3D })))
 
 const DURATIONS: { value: Duration; label: string; glyph: string }[] = [
-  { value: 'w', label: 'Tròn', glyph: '\\uE1D2' }, { value: 'h', label: 'Trắng', glyph: '\\uE1D3' },
-  { value: 'q', label: 'Đen', glyph: '\\uE1D5' }, { value: '8', label: 'Móc đơn', glyph: '\\uE1D7' },
-  { value: '16', label: 'Móc kép', glyph: '\\uE1D9' }, { value: '32', label: 'Móc ba', glyph: '\\uE1DB' },
+  { value: 'w', label: 'Tròn', glyph: '\uE1D2' }, { value: 'h', label: 'Trắng', glyph: '\uE1D3' },
+  { value: 'q', label: 'Đen', glyph: '\uE1D5' }, { value: '8', label: 'Móc đơn', glyph: '\uE1D7' },
+  { value: '16', label: 'Móc kép', glyph: '\uE1D9' }, { value: '32', label: 'Móc ba', glyph: '\uE1DB' },
 ]
 const DIATONIC = ['c', 'd', 'e', 'f', 'g', 'a', 'b']
 const BEATS: Record<Duration, number> = { w: 4, h: 2, q: 1, '8': .5, '16': .25, '32': .125 }
@@ -447,7 +447,7 @@ function App() {
           {activeTool === 'notes' && <>
             <div className="field-label">Trường độ</div><div className="duration-grid">{DURATIONS.map(item => <button key={item.value} className={duration === item.value ? 'duration selected' : 'duration'} onClick={() => { setDuration(item.value); setRest(false) }}><span>{item.glyph}</span><small>{item.label}</small></button>)}</div>
             <div className="note-options"><button className={dotted ? 'mini-tool selected' : 'mini-tool'} onClick={() => setDotted(!dotted)}>·　Chấm dôi</button><button className={rest ? 'mini-tool selected' : 'mini-tool'} onClick={() => setRest(!rest)}>𝄽　Dấu nghỉ</button></div>
-            <div className="tool-divider-line" /><div className="field-label">Dấu hóa</div><div className="accidental-grid">{([{ value: '', label: 'Không' }, { value: '#', label: 'Thăng \\uE262' }, { value: 'b', label: 'Giáng \\uE260' }, { value: 'n', label: 'Bình \\uE261' }] as const).map(item => <button key={item.value || 'none'} className={accidental === item.value ? 'mini-tool selected' : 'mini-tool'} onClick={() => setAccidental(item.value)}>{item.label}</button>)}</div>
+            <div className="tool-divider-line" /><div className="field-label">Dấu hóa</div><div className="accidental-grid">{([{ value: '', label: 'Không' }, { value: '#', label: 'Thăng \uE262' }, { value: 'b', label: 'Giáng \uE260' }, { value: 'n', label: 'Bình \uE261' }] as const).map(item => <button key={item.value || 'none'} className={accidental === item.value ? 'mini-tool selected' : 'mini-tool'} onClick={() => setAccidental(item.value)}>{item.label}</button>)}</div>
           </>}
           {activeTool === 'score' && <>
             <label className="field-label" htmlFor="clef">Khóa nhạc</label><select id="clef" className="title-input" value={clef} onChange={e => setClef(e.target.value as typeof clef)}><option value="treble">Khóa Sol</option><option value="bass">Khóa Fa</option><option value="alto">Khóa Đô (Alto)</option><option value="tenor">Khóa Đô (Tenor)</option></select>
