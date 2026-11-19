@@ -292,8 +292,8 @@ function App() {
 
   return <main className="app-shell">
     <header className="topbar">
-      <div className="brand"><div className="brand-mark">M</div><div><strong>MeloLegacy</strong><span>{showEcosystemMap ? 'BẢN ĐỒ HỆ SINH THÁI 3D' : 'PHÒNG SOẠN NHẠC'}</span></div></div>
-      <div className="top-actions"><button className="map-toggle-button" onClick={() => setShowEcosystemMap(value => !value)}>{showEcosystemMap ? 'Phòng Soạn Nhạc' : 'Sơ đồ 3D'}</button><span className="save-state"><i />{status}</span><button className="gold-button" onClick={() => window.print()}>Xuất PDF</button></div>
+      <div className="brand"><div className="brand-mark">M</div><div><strong>MeloLegacy</strong><span>{showEcosystemMap ? 'BẢN ĐỒ HỆ SINH THÁI' : 'PHÒNG SOẠN NHẠC'}</span></div></div>
+      <div className="top-actions"><button className="map-toggle-button" onClick={() => setShowEcosystemMap(value => !value)}>{showEcosystemMap ? 'Phòng Soạn Nhạc' : 'Bản đồ Melo'}</button><span className="save-state"><i />{status}</span><button className="gold-button" onClick={() => window.print()}>Xuất PDF</button></div>
     </header>
     {showEcosystemMap ? <Suspense fallback={<div className="melo-map-loading">Đang mở sơ đồ 3D…</div>}><MeloEcosystem3D onClose={() => setShowEcosystemMap(false)} /></Suspense> : <><section className="workspace">
       <aside className="tool-panel">
