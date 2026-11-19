@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Accidental, Beam, Formatter, Renderer, Stave, StaveNote, Voice } from 'vexflow'
 import './App.css'
+import { loadLocalScore, saveLocalScore } from './localScoreStore'
 
 type Duration = 'w' | 'h' | 'q' | '8' | '16' | '32'
 type NoteItem = { id: number; staff: number; measure: number; key: string; duration: Duration; dotted: boolean; accidental: '' | '#' | 'b' | 'n'; rest: boolean }
@@ -87,7 +88,9 @@ function App() {
   })
   const [history, setHistory] = useState<NoteItem[][]>([])
   const [future, setFuture] = useState<NoteItem[][]>([])
-  const [status, setStatus] = useState('Đã lưu trên thiết bị')
+  const [status, setStatus] = useState('Đang mở dữ liệu trên thiết bị…')
+  const [storageReady, setStorageReady] = useState(false)
+  const [sourceMusicXml, setSourceMusicXml] = useState<string | null>(null)
   const [dynamic, setDynamic] = useState('mf')
   const [tempo, setTempo] = useState(80)
   const [omrBusy, setOmrBusy] = useState(false)
@@ -105,9 +108,47 @@ function App() {
   const paperHeight = Math.max(1123, 190 + systems * systemGap)
 
   useEffect(() => {
-    localStorage.setItem('melo-composer-notes-v2', JSON.stringify(notes))
-    setStatus('Đã lưu trên thiết bị')
-  }, [notes])
+    let active = true
+    loadLocalScore().then(snapshot => {
+      if (!active) return
+      if (snapshot) {
+        setNotes(Array.isArray(snapshot.notes) ? snapshot.notes as NoteItem[] : [])
+        setTitle(snapshot.title)
+        setLayout(snapshot.layout as Layout)
+        setClef(snapshot.clef as typeof clef)
+        setTime(snapshot.time)
+        setKeySig(snapshot.keySig)
+        setTempo(snapshot.tempo)
+        setDynamic(snapshot.dynamic)
+        setSourceMusicXml(snapshot.sourceMusicXml)
+      }
+      setStorageReady(true)
+      setStatus('Dữ liệu trên thiết bị đã sẵn sàng')
+    }).catch(error => {
+      if (!active) return
+      setStorageReady(true)
+      setStatus(error instanceof Error ? error.message : 'Không đọc được dữ liệu cục bộ')
+    })
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    if (!storageReady) return
+    saveLocalScore({ notes, title, layout, clef, time, keySig, tempo, dynamic, sourceMusicXml })
+      .then(() => setStatus('Đã lưu trên thiết bị'))
+      .catch(error => setStatus(error instanceof Error ? error.message : 'Không lưu được dữ liệu trên thiết bị'))
+  }, [storageReady, notes, title, layout, clef, time, keySig, tempo, dynamic, sourceMusicXml])
+
+  function downloadOriginalMusicXml() {
+    if (!sourceMusicXml) return
+    const blob = new Blob([sourceMusicXml], { type: 'application/vnd.recordare.musicxml+xml;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'melolegacy-ban-goc.musicxml'
+    link.click()
+    URL.revokeObjectURL(url)
+  }
 
   const grouped = useMemo(() => {
     const result = new Map<string, NoteItem[]>()
@@ -275,9 +316,11 @@ function App() {
       setOmrMessage('Đang nạp MusicXML vào trình soạn nhạc…')
       const xmlResponse = await fetch('/api/omr/jobs/' + encodeURIComponent(created.id) + '/musicxml')
       if (!xmlResponse.ok) throw new Error(await xmlResponse.text() || 'Không tải được MusicXML.')
-      const imported = parseMusicXml(await xmlResponse.text())
+      const originalMusicXml = await xmlResponse.text()
+      const imported = parseMusicXml(originalMusicXml)
       if (!imported.notes.length) throw new Error('MusicXML không có nốt nhạc để đưa vào trình soạn.')
       commit(imported.notes)
+      setSourceMusicXml(originalMusicXml)
       setTitle(imported.title)
       setLayout(imported.partCount > 1 ? 'orchestra' : 'solo')
       setImportedStaffCount(imported.staffCount)
@@ -296,7 +339,7 @@ function App() {
       <div className="brand"><div className="brand-mark">M</div><div><strong>MeloLegacy</strong><span>{showEcosystemMap ? 'BẢN ĐỒ HỆ SINH THÁI 3D' : 'PHÒNG SOẠN NHẠC'}</span></div></div>
       <div className="top-actions"><button className="map-toggle-button" onClick={() => setShowEcosystemMap(value => !value)}>{showEcosystemMap ? 'Phòng Soạn Nhạc' : 'Sơ đồ 3D'}</button><span className="save-state"><i />{status}</span><button className="gold-button" onClick={() => window.print()}>Xuất PDF</button></div>
     </header>
-    {showEcosystemMap ? <Suspense fallback={<div className="melo-map-loading">Đang mở sơ đồ 3D…</div>}><MeloEcosystem3D onClose={() => setShowEcosystemMap(false)} /></Suspense> : <><section className="workspace">
+    {showEcosystemMap ? <Suspense fallback={<div className="melo-map-loading">Đang mở sơ đồ 3D…</div>}><MeloEcosystem3D onClose={() => setShowEcosystemMap(false)} /></Suspense> : <><section className="workspace" aria-busy={!storageReady} style={{ pointerEvents: storageReady ? 'auto' : 'none' }}>
       <aside className="tool-rail" aria-label="Công cụ Phòng Soạn Nhạc">
         <nav className="tool-icon-list" aria-label="Nhóm công cụ">
           <button className={activeTool === 'file' ? 'tool-icon active' : 'tool-icon'} aria-label="Tác phẩm và nhập PDF" title="Tác phẩm và nhập PDF" onClick={() => setActiveTool(activeTool === 'file' ? null : 'file')}><span>▤</span></button>
@@ -314,6 +357,7 @@ function App() {
             <input ref={pdfInputRef} className="visually-hidden-input" type="file" accept="application/pdf,.pdf" disabled={omrBusy} onChange={event => recognizePdf(event.target.files?.[0])} />
             <button className="tool-action primary" disabled={omrBusy} onClick={() => pdfInputRef.current?.click()}><span>⇧</span>{omrBusy ? 'Đang nhận dạng PDF…' : 'Nhập PDF và nhận dạng'}</button>
             <p className="tool-help">{omrMessage}</p>{omrJobId && <small className="tool-help">Mã xử lý: {omrJobId}</small>}
+            {sourceMusicXml && <><p className="tool-help">Bản MusicXML gốc được giữ riêng, không bị thay thế khi chỉnh sửa bản làm việc.</p><button className="tool-action" onClick={downloadOriginalMusicXml}><span>⇩</span>Tải MusicXML gốc</button></>}
           </>}
           {activeTool === 'layout' && <div className="layout-options">{(['solo', 'large', 'grand', 'orchestra'] as Layout[]).map((item, index) => <button key={item} className={layout === item ? 'layout-choice selected' : 'layout-choice'} onClick={() => setLayout(item)}><span className="layout-icon">{['≋', '☰', '𝄞\n𝄢', '♬'][index]}</span><span><b>{['Solo', 'Khuông lớn', 'Đại khuông', 'Dàn nhạc'][index]}</b><small>{['10 khuông · Một bè', '6 khuông · Cỡ lớn', 'Sol + Fa · Piano', '4 bè · Phác thảo tổng phổ'][index]}</small></span></button>)}</div>}
           {activeTool === 'notes' && <>
