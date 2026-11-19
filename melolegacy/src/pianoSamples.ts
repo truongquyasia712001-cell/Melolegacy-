@@ -8,6 +8,8 @@ export type PianoSample = {
 const DB_NAME = 'melolegacy-audio'
 const STORE_NAME = 'piano-samples'
 const DB_VERSION = 1
+const META_PIANO_OGG = 'https://raw.githubusercontent.com/facebookincubator/Meta-open-sound/main/systems/instruments/meta-piano/ogg'
+const META_NOTE_NAMES = ['C', 'Cs', 'D', 'Ds', 'E', 'F', 'Fs', 'G', 'Gs', 'A', 'As', 'B']
 
 function openSampleDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -50,6 +52,36 @@ export async function savePianoSampleBank(samples: PianoSample[]): Promise<void>
   } finally {
     db.close()
   }
+}
+
+/** Downloads the official CC0 Meta Piano OGGs and stores one mf layer for all 88 keys. */
+export async function loadMetaPianoSamples(
+  context: AudioContext,
+  onProgress?: (loaded: number, total: number) => void,
+): Promise<PianoSample[]> {
+  const midiNotes = Array.from({ length: 88 }, (_, index) => index + 21)
+  const result: PianoSample[] = []
+  const batchSize = 5
+  for (let offset = 0; offset < midiNotes.length; offset += batchSize) {
+    const batch = midiNotes.slice(offset, offset + batchSize)
+    const loaded = await Promise.all(batch.map(async midi => {
+      const pitchClass = midi % 12
+      const octave = Math.floor(midi / 12) - 1
+      const file = `INSPiano_Vel03_${META_NOTE_NAMES[pitchClass]}${octave}_01.ogg`
+      const response = await fetch(`${META_PIANO_OGG}/${file}`)
+      if (!response.ok) throw new Error(`Không tải được mẫu ${META_NOTE_NAMES[pitchClass]}${octave} từ Meta Open Sound (HTTP ${response.status}).`)
+      const audio = await context.decodeAudioData(await response.arrayBuffer())
+      return {
+        midi,
+        sampleRate: audio.sampleRate,
+        samples: audio.getChannelData(0).slice(),
+        sourceName: 'Meta Piano · CC0 1.0',
+      } satisfies PianoSample
+    }))
+    result.push(...loaded)
+    onProgress?.(result.length, midiNotes.length)
+  }
+  return result.sort((a, b) => a.midi - b.midi)
 }
 
 export function midiFromPitch(key: string, accidental: '' | '#' | 'b' | 'n' = ''): number {
