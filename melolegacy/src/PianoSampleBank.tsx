@@ -137,7 +137,7 @@ export function PianoSampleBank({ onSaved }: { onSaved: (samples: PianoSample[])
 
   return <section className="sample-bank">
     <div className="panel-heading">THƯ VIỆN SAMPLE PIANO</div>
-    <p className="hint">Nguồn Meta Open Sound · 88 phím A0–C8 · 4 lớp lực đánh · giấy phép CC0 1.0.</p>
+    <p className="hint">Nguồn Meta Open Sound · 88 phím A0–C8 · đang nạp lớp lực đánh mf để thử nghiệm · nguồn gốc có 4 lớp · CC0 1.0.</p>
     <button className="gold-button sample-save" disabled={busy} onClick={loadOfficialMetaPiano}>{busy ? 'Đang xử lý…' : 'Tải piano Meta · 88 phím'}</button>
     <input ref={inputRef} type="file" accept="audio/*,.m4a,.mp3,.wav,.aiff" hidden onChange={event => importRecording(event.target.files?.[0])} />
     <button className="mini-tool sample-import" disabled={busy} onClick={() => inputRef.current?.click()}>＋　Nạp bản thu piano riêng</button>
