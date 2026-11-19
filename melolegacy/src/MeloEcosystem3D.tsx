@@ -123,7 +123,6 @@ export function MeloEcosystem3D({ onClose }: { onClose: () => void }) {
             showNavInfo={false}
             enableNodeDrag
             cooldownTicks={120}
-            cameraPosition={{ z: 620 }}
           />
           <div className="melo-map-instructions">Kéo để xoay · Cuộn để phóng to / thu nhỏ · Chọn một nút để xem mô tả</div>
         </div>
