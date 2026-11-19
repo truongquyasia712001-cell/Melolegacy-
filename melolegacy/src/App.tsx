@@ -5,6 +5,7 @@ import './App.css'
 type Duration = 'w' | 'h' | 'q' | '8' | '16' | '32'
 type NoteItem = { id: number; staff: number; measure: number; key: string; duration: Duration; dotted: boolean; accidental: '' | '#' | 'b' | 'n'; rest: boolean }
 type Layout = 'solo' | 'large' | 'grand' | 'orchestra'
+type WorkspaceMode = 'compose' | 'perform'
 const DURATIONS: { value: Duration; label: string; glyph: string }[] = [
   { value: 'w', label: 'Tròn', glyph: '𝅝' }, { value: 'h', label: 'Trắng', glyph: '𝅗𝅥' },
   { value: 'q', label: 'Đen', glyph: '♩' }, { value: '8', label: 'Móc đơn', glyph: '♪' },
@@ -32,6 +33,9 @@ function makeVexNote(item: NoteItem, clef: string) {
 
 function App() {
   const [layout, setLayout] = useState<Layout>('solo')
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('compose')
+  const [playbackStatus, setPlaybackStatus] = useState('Sẵn sàng trình diễn')
+  const audioContextRef = useRef<AudioContext | null>(null)
   const [duration, setDuration] = useState<Duration>('q')
   const [dotted, setDotted] = useState(false)
   const [rest, setRest] = useState(false)
@@ -190,13 +194,67 @@ function App() {
     if (window.confirm('Xóa toàn bộ ký hiệu trên bản nhạc?')) commit([])
   }
 
+  function stopPlayback() {
+    const context = audioContextRef.current
+    if (context) {
+      void context.close()
+      audioContextRef.current = null
+    }
+    setPlaybackStatus('Đã dừng trình diễn')
+  }
+
+  async function playScore() {
+    if (!notes.length) {
+      setPlaybackStatus('Bản nhạc chưa có nốt để phát')
+      return
+    }
+    stopPlayback()
+    const context = new window.AudioContext()
+    audioContextRef.current = context
+    await context.resume()
+    const beatSeconds = 60 / Math.max(20, Math.min(300, tempo || 80))
+    let cursor = context.currentTime + 0.08
+    const ordered = [...notes].sort((a, b) => a.staff - b.staff || a.measure - b.measure || a.id - b.id)
+    for (const item of ordered) {
+      const seconds = BEATS[item.duration] * (item.dotted ? 1.5 : 1) * beatSeconds
+      if (!item.rest) {
+        const match = /^([a-g])\/(\d+)$/.exec(item.key)
+        if (match) {
+          const semitones = ({c:0,d:2,e:4,f:5,g:7,a:9,b:11} as Record<string,number>)[match[1]]
+          const midi = (Number(match[2]) + 1) * 12 + semitones + (item.accidental === '#' ? 1 : item.accidental === 'b' ? -1 : 0)
+          const oscillator = context.createOscillator()
+          const gain = context.createGain()
+          oscillator.type = 'sine'
+          oscillator.frequency.value = 440 * Math.pow(2, (midi - 69) / 12)
+          gain.gain.setValueAtTime(0.0001, cursor)
+          gain.gain.exponentialRampToValueAtTime(0.16, cursor + 0.015)
+          gain.gain.setValueAtTime(0.16, Math.max(cursor + 0.02, cursor + seconds * 0.82))
+          gain.gain.exponentialRampToValueAtTime(0.0001, cursor + seconds * 0.94)
+          oscillator.connect(gain)
+          gain.connect(context.destination)
+          oscillator.start(cursor)
+          oscillator.stop(cursor + seconds)
+        }
+      }
+      cursor += seconds
+    }
+    setPlaybackStatus('Đang trình diễn · ' + tempo + ' BPM')
+    window.setTimeout(() => {
+      if (audioContextRef.current === context) {
+        void context.close()
+        audioContextRef.current = null
+        setPlaybackStatus('Đã trình diễn xong')
+      }
+    }, Math.max(0, (cursor - context.currentTime) * 1000 + 100))
+  }
+
   return <main className="app-shell">
     <header className="topbar">
       <div className="brand"><div className="brand-mark">M</div><div><strong>MeloLegacy</strong><span>PHÒNG SOẠN NHẠC</span></div></div>
-      <div className="top-actions"><span className="save-state"><i />{status}</span><button className="gold-button" onClick={() => window.print()}>Xuất / In</button></div>
+      <div className="top-actions"><span className="save-state"><i />{status}</span><div className="mode-switch"><button className={workspaceMode === 'compose' ? 'active' : ''} onClick={() => setWorkspaceMode('compose')}>Soạn nhạc</button><button className={workspaceMode === 'perform' ? 'active' : ''} onClick={() => setWorkspaceMode('perform')}>Mở trình diễn</button></div><button className="gold-button" onClick={() => window.print()}>Xuất / In</button></div>
     </header>
     <section className="workspace">
-      <aside className="tool-panel">
+      {workspaceMode === 'compose' && <aside className="tool-panel">
         <div className="panel-heading">TÁC PHẨM</div>
         <label className="field-label" htmlFor="score-title">Tên tác phẩm</label>
         <input id="score-title" className="title-input" value={title} onChange={e => setTitle(e.target.value)} />
@@ -224,9 +282,9 @@ function App() {
         <div className="action-stack"><button onClick={undo} disabled={!history.length}>↶　Hoàn tác</button><button onClick={redo} disabled={!future.length}>↷　Làm lại</button><button onClick={clearScore}>⌫　Xóa bản nhạc</button></div>
         <p className="hint">Chọn trường độ và chạm đúng vị trí trên khuông để ghi nốt. Các nốt được khắc bằng bộ máy ký âm VexFlow.</p>
         <div className="panel-foot">Bản nhạc lưu cục bộ trên thiết bị này.</div>
-      </aside>
+      </aside>}
       <section className="score-area">
-        <div className="score-toolbar"><div><span className="crumb">MeloLegacy</span><span className="slash">/</span><b>Phòng Soạn Nhạc</b></div><div className="zoom-label">A4 · Dọc · {systems} hệ thống</div></div>
+        <div className="score-toolbar"><div><span className="crumb">MeloLegacy</span><span className="slash">/</span><b>Phòng Soạn Nhạc</b></div><div className="reader-actions"><span className="zoom-label">A4 · Dọc · {systems} hệ thống</span><span className="play-state">{playbackStatus}</span><button onClick={playScore}>▶ Trình diễn</button><button onClick={stopPlayback}>■ Dừng</button></div></div>
         <div className="paper-wrap"><div className="paper" style={{ minHeight: paperHeight }}>
           <div className="paper-head"><div className="paper-kicker">MELOLEGACY · MUSIC COMPOSITION</div><h1>{title || 'Tác phẩm mới'}</h1><div className="paper-meta"><span>Tác giả: __________________</span><span>♩ = {tempo}　{dynamic}</span></div></div>
           <div className="notation-host" ref={scoreRef} onClick={addFromCanvas} style={{ minHeight: paperHeight - 180 }} />
