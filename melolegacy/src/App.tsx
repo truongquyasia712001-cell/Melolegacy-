@@ -84,6 +84,16 @@ function App() {
   const [showEcosystemMap, setShowEcosystemMap] = useState(false)
   const [activeTool, setActiveTool] = useState<'file' | 'layout' | 'notes' | 'score' | 'playback' | 'edit' | 'write' | null>(null)
   const [duration, setDuration] = useState<Duration>('q')
+  const [scoreInkMode, setScoreInkMode] = useState(false)
+  const [scoreInkStrokes, setScoreInkStrokes] = useState<InkStroke[]>(() => {
+    try {
+      const stored = localStorage.getItem('melo-score-ink-v1')
+      const parsed: unknown = stored ? JSON.parse(stored) : []
+      return Array.isArray(parsed) ? parsed as InkStroke[] : []
+    } catch { return [] }
+  })
+  const scoreInkCanvasRef = useRef<HTMLCanvasElement>(null)
+  const scoreInkPointerRef = useRef<number | null>(null)
   const [handwritingStrokes, setHandwritingStrokes] = useState<InkStroke[]>(() => {
     try {
       const stored = localStorage.getItem('melo-handwriting-strokes-v1')
@@ -259,6 +269,60 @@ function App() {
       setStatus('Không thể lưu nét viết vào bộ nhớ trên thiết bị')
     }
   }, [handwritingStrokes])
+
+  useEffect(() => {
+    try { localStorage.setItem('melo-score-ink-v1', JSON.stringify(scoreInkStrokes)) }
+    catch { setStatus('Không thể lưu nét viết trên khuông vào thiết bị') }
+  }, [scoreInkStrokes])
+
+  useEffect(() => {
+    const host = scoreRef.current
+    const canvas = scoreInkCanvasRef.current
+    if (!host || !canvas) return
+    const resize = () => {
+      const rect = host.getBoundingClientRect()
+      const ratio = window.devicePixelRatio || 1
+      canvas.width = Math.max(1, Math.round(rect.width * ratio))
+      canvas.height = Math.max(1, Math.round(rect.height * ratio))
+      canvas.style.width = rect.width + 'px'
+      canvas.style.height = rect.height + 'px'
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+      ctx.setTransform(canvas.width / 1000, 0, 0, canvas.height / 1000, 0, 0)
+      ctx.lineWidth = 3.2
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      ctx.strokeStyle = '#25221d'
+      scoreInkStrokes.forEach(stroke => {
+        if (!stroke.length) return
+        ctx.beginPath(); ctx.moveTo(stroke[0].x, stroke[0].y)
+        stroke.slice(1).forEach(point => ctx.lineTo(point.x, point.y))
+        ctx.stroke()
+      })
+    }
+    resize()
+    const observer = new ResizeObserver(resize)
+    observer.observe(host)
+    return () => observer.disconnect()
+  }, [scoreInkStrokes, systems, systemGap, paperHeight, activeTool])
+
+  function addScoreInkPoint(event: React.PointerEvent<HTMLCanvasElement>) {
+    const canvas = event.currentTarget
+    const rect = canvas.getBoundingClientRect()
+    const point = { x: (event.clientX - rect.left) / rect.width * 1000, y: (event.clientY - rect.top) / rect.height * 1000 }
+    if (event.type === 'pointerdown') {
+      scoreInkPointerRef.current = event.pointerId
+      canvas.setPointerCapture(event.pointerId)
+      setScoreInkStrokes(prev => [...prev, [point]])
+    } else if (scoreInkPointerRef.current === event.pointerId) {
+      setScoreInkStrokes(prev => {
+        if (!prev.length) return prev
+        const next = prev.slice()
+        next[next.length - 1] = [...next[next.length - 1], point]
+        return next
+      })
+    }
+  }
 
   useEffect(() => {
     const canvas = handwritingCanvasRef.current
@@ -508,7 +572,10 @@ function App() {
             <p className="tool-help">Thiết lập tempo và cường độ hiển thị trên bản nhạc. Bộ phát âm thanh chưa được kết nối trong phiên bản này.</p>
           </>}
           {activeTool === 'write' && <div className="handwriting-panel">
-            <p className="tool-help">Viết trực tiếp bằng Apple Pencil hoặc bút cảm ứng. Nét viết được giữ khi đóng/mở bảng công cụ trong phiên làm việc; bước nhận dạng thành nốt nhạc sẽ được kết nối ở giai đoạn tiếp theo.</p>
+            <p className="tool-help">Bật chế độ viết để dùng Apple Pencil trực tiếp trên khuông nhạc. Nét viết được lưu trên thiết bị và giữ nguyên khi tải lại trang.</p>
+            <button className={scoreInkMode ? 'tool-action primary' : 'tool-action'} onClick={() => setScoreInkMode(value => !value)}><span>✍</span>{scoreInkMode ? 'Đang viết trực tiếp trên khuông' : 'Bắt đầu viết trên khuông'}</button>
+            <button className="tool-action" onClick={() => setScoreInkStrokes(prev => prev.slice(0, -1))} disabled={!scoreInkStrokes.length}><span>↶</span>Hoàn tác nét trên khuông</button>
+            <button className="tool-action" onClick={() => setScoreInkStrokes([])} disabled={!scoreInkStrokes.length}><span>⌫</span>Xóa nét trên khuông</button>
             <canvas ref={handwritingCanvasRef} className="handwriting-canvas" width={720} height={260}
               onPointerDown={event => { const canvas = event.currentTarget; const rect = canvas.getBoundingClientRect(); const point = { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height }; inkPointerRef.current = event.pointerId; canvas.setPointerCapture(event.pointerId); setHandwritingStrokes(prev => [...prev, [point]]) }}
               onPointerMove={event => { if (inkPointerRef.current !== event.pointerId) return; const canvas = event.currentTarget; const rect = canvas.getBoundingClientRect(); const point = { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height }; setHandwritingStrokes(prev => { if (!prev.length) return prev; const next = prev.slice(); next[next.length - 1] = [...next[next.length - 1], point]; return next }) }}
@@ -525,7 +592,15 @@ function App() {
         <div className="score-toolbar"><div><span className="crumb">MeloLegacy</span><span className="slash">/</span><b>Phòng Soạn Nhạc</b></div><div className="zoom-label">A4 · Dọc · {systems} hệ thống · 5 ô nhịp / hệ</div></div>
         <div className="paper-wrap"><div className="paper" style={{ minHeight: paperHeight }}>
           <div className="paper-head"><div className="paper-kicker">MELOLEGACY · MUSIC COMPOSITION</div><h1>{title || 'Tác phẩm mới'}</h1><div className="paper-meta"><span>Tác giả: __________________</span><span>♩ = {tempo}　{dynamic}</span></div></div>
-          <div className="notation-host" ref={scoreRef} onClick={addFromCanvas} style={{ minHeight: paperHeight - 180 }} />
+          <div className={scoreInkMode ? 'score-writing-layer ink-active' : 'score-writing-layer'}>
+            <div className="notation-host" ref={scoreRef} onClick={scoreInkMode ? undefined : addFromCanvas} style={{ minHeight: paperHeight - 180 }} />
+            <canvas ref={scoreInkCanvasRef} className="score-ink-canvas" aria-label="Vùng viết tay trên khuông nhạc"
+              style={{ pointerEvents: scoreInkMode ? 'auto' : 'none' }}
+              onPointerDown={event => addScoreInkPoint(event)}
+              onPointerMove={event => { if (scoreInkPointerRef.current === event.pointerId) addScoreInkPoint(event) }}
+              onPointerUp={event => { if (scoreInkPointerRef.current === event.pointerId) scoreInkPointerRef.current = null }}
+              onPointerCancel={event => { if (scoreInkPointerRef.current === event.pointerId) scoreInkPointerRef.current = null }} />
+          </div>
           <div className="paper-bottom"><span>MeloLegacy · Di sản âm nhạc</span><span>Trang 1</span></div>
         </div></div>
       </section>
