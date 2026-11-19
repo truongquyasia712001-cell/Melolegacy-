@@ -70,7 +70,7 @@ export default function App() {
     const clefHit = target.closest('[class*="clef"]')
     const timeHit = target.closest('[class*="timesig"], [class*="time-signature"]')
     const keyHit = target.closest('[class*="keysig"], [class*="key-signature"]')
-    const hit = kind === 'clef' ? clefHit || localX < 70 : kind === 'time' ? timeHit || (localX >= 70 && localX < 100) : keyHit || (localX >= 100 && localX < 150)
+    const hit = kind === 'clef' ? clefHit : kind === 'time' ? timeHit : keyHit
     if (!hit) return false
     event.preventDefault()
     event.stopPropagation()
