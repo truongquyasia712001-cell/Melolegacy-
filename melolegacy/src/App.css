@@ -32,3 +32,11 @@
  .tool-icon{width:42px;height:42px}
  .tool-popover{left:8px;right:8px;bottom:70px;top:auto;width:auto;max-height:min(65vh,560px)}
 }
+
+/* Refined notation proportions and handwriting workspace */
+.handwriting-tool{color:#9a7131;background:#fbf6eb;border-color:#d9c69f}
+.handwriting-tool span{font-size:22px}
+.handwriting-canvas{display:block;width:100%;height:210px;border:1px solid #ded4c2;border-radius:8px;background-color:#fffdf8;background-image:linear-gradient(#eee8dc 1px,transparent 1px);background-size:100% 32px;touch-action:none;cursor:crosshair}
+.handwriting-notice{padding:9px 10px;border-left:2px solid #c7a66a;background:#faf6ed;color:#786747}
+.handwriting-panel{display:grid;gap:9px}
+@media(max-width:760px){.tool-icon-list{gap:4px}.tool-icon{width:39px;height:39px;font-size:20px}.handwriting-canvas{height:180px}}
