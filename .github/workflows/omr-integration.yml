@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main, feature/audiveris-omr-pdf]
   push:
-    branches: [feature/audiveris-omr-pdf, feature/melolegacy-3d-ecosystem-map]
+    branches: [feature/audiveris-omr-pdf, feature/melolegacy-3d-ecosystem-map, feature/omr-piano-reading-playback]
 
 jobs:
   web-build:
