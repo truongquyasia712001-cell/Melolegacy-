@@ -8,7 +8,7 @@ export type PianoSample = {
 const DB_NAME = 'melolegacy-audio'
 const STORE_NAME = 'piano-samples'
 const DB_VERSION = 1
-const META_PIANO_OGG = 'https://raw.githubusercontent.com/facebookincubator/Meta-open-sound/main/systems/instruments/meta-piano/ogg'
+const META_PIANO_OGG = '/audio/meta-piano'
 const META_NOTE_NAMES = ['C', 'Cs', 'D', 'Ds', 'E', 'F', 'Fs', 'G', 'Gs', 'A', 'As', 'B']
 
 function openSampleDb(): Promise<IDBDatabase> {
