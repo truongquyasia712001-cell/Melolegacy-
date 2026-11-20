@@ -28,6 +28,42 @@ const CLEFS = [
 const FIFTHS = ['C', 'G', 'D', 'A', 'E', 'B', 'Gb', 'Db', 'Ab', 'Eb', 'Bb', 'F']
 const KEY_LABELS: Record<string, string> = { C: 'Đô', G: 'Sol', D: 'Rê', A: 'La', E: 'Mi', B: 'Si', Gb: 'Sol♭', Db: 'Rê♭', Ab: 'La♭', Eb: 'Mi♭', Bb: 'Si♭', F: 'Fa' }
 
+function SymbolPreview({ glyph, label }: { glyph: string; label: string }) {
+  const note = label.startsWith('Nốt')
+  const rest = label.startsWith('Dấu nghỉ')
+  const clef = label.startsWith('Khóa')
+  const accidental = ['Thăng','Giáng','Bình','Thăng kép','Giáng kép'].includes(label)
+  const duration = label === 'Nốt tròn' ? 'whole' : label === 'Nốt trắng' ? 'half' : 'filled'
+  const flags = label === 'Móc đơn' || label === 'Dấu nghỉ móc đơn' ? 1 : label === 'Móc kép' || label === 'Dấu nghỉ móc kép' ? 2 : label === 'Móc ba' ? 3 : 0
+  const short: Record<string,string> = {
+    'Alla breve':'C|','Nhịp thông thường':'C','Staccato':'·','Tenuto':'—','Accent':'>','Marcato':'^','Fermata':'𝄐',
+    'Breath mark':"'",'Trill':'tr','Mordent':'mord.','Inverted mordent':'inv.','Turn':'turn','Inverted turn':'inv.','Shake':'tr',
+    'Slur':'⌒','Tie':'‿','Crescendo hairpin':'<','Diminuendo hairpin':'>','Mở dấu lặp':':|','Đóng dấu lặp':'|:',
+    'Segno':'S','Coda':'C','Da capo':'D.C.','Dal segno':'D.S.','Fine':'Fine','Khóa bộ gõ':'P',
+    'Lên quãng tám':'8va','Xuống quãng tám':'8vb','Lên hai quãng tám':'15ma','Xuống hai quãng tám':'15mb',
+    'Tempo':'♩=','Pizzicato':'pizz.','Arco':'arco','Simile':'sim.','Ritardando':'rit.','Accelerando':'accel.'
+  }
+  if (note) return <svg className="notation-symbol-glyph" viewBox="0 0 40 40" aria-hidden="true">
+    {duration === 'whole' ? <ellipse cx="15" cy="23" rx="8" ry="5" fill="none" stroke="currentColor" strokeWidth="2.5"/> : <>
+      <ellipse cx="15" cy="27" rx="7.5" ry="5.5" transform="rotate(-22 15 27)" fill={duration === 'half' ? 'white' : 'currentColor'} stroke="currentColor" strokeWidth="2"/>
+      <path d="M22 26V5" stroke="currentColor" strokeWidth="2.2"/>
+      {Array.from({length:flags},(_,i)=><path key={i} d={`M22 ${5+i*3} Q34 ${8+i*3} 27 ${17+i*3}`} fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round"/>)}
+    </>}
+  </svg>
+  if (rest) return <svg className="notation-symbol-glyph" viewBox="0 0 40 40" aria-hidden="true">
+    {label==='Dấu nghỉ tròn' ? <rect x="9" y="10" width="17" height="5" fill="currentColor"/> :
+     label==='Dấu nghỉ trắng' ? <rect x="9" y="15" width="17" height="5" fill="currentColor"/> :
+     <path d={flags===0 ? 'M20 6l-7 9 10 6-7 8 5 5' : flags===1 ? 'M21 5v13q8-2 5 5-2 5-7 8' : 'M21 5v12q9-1 5 6-2 4-7 7'} fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>}
+  </svg>
+  if (clef) return <svg className="notation-symbol-glyph" viewBox="0 0 40 40" aria-hidden="true"><text x="20" y="30" textAnchor="middle" fontFamily="Georgia,serif" fontSize="29" fill="currentColor">{label.includes('Sol')?'G':label.includes('Fa')?'F':label.includes('Đô')?'C':'P'}</text></svg>
+  if (accidental) return <svg className="notation-symbol-glyph" viewBox="0 0 40 40" aria-hidden="true">
+    {label.includes('Thăng') ? <><path d="M14 7v25M25 4v25M8 16l23-4M8 26l23-4" stroke="currentColor" strokeWidth="2.4"/></> :
+     label.includes('Giáng') ? <><path d="M14 5v29M14 19q17-10 17 2t-17 5" fill="none" stroke="currentColor" strokeWidth="2.6"/></> :
+     <><path d="M13 5v29M26 5v29M13 17l13-4M13 27l13-4" stroke="currentColor" strokeWidth="2.4"/></>}
+  </svg>
+  return <span className="notation-symbol-glyph notation-symbol-text" aria-hidden="true">{short[label] ?? (glyph.length <= 4 ? glyph : label.slice(0,4))}</span>
+}
+
 function setNativeSelect(id: string, value: string) {
   const select = document.getElementById(id) as HTMLSelectElement | null
   if (!select) return
@@ -243,7 +279,7 @@ export default function App() {
       </div>}
       {symbolsOpen&&<div className={`notation-symbol-rail rail-${dock}`}>
         <div className="notation-rail-title"><b>{SYMBOL_GROUPS.find(g=>g.id===activeGroup)?.name}</b><label className="auto-collapse"><input type="checkbox" checked={autoCollapse} onChange={e=>setAutoCollapse(e.target.checked)}/> Tự thu gọn</label><button onClick={()=>setSymbolsOpen(false)}>×</button></div>
-        <div className="notation-rail-items">{(SYMBOL_GROUPS.find(g=>g.id===activeGroup)?.items??[]).map(([glyph,label])=><button key={label} title={label} className={selectedSymbol===label?'selected':''} onClick={()=>{setSelectedSymbol(label);if(autoCollapse)setSymbolsOpen(false);if(activeGroup==='notes'){const i=['𝅝','𝅗𝅥','♩','♪','𝅘𝅥𝅯','𝅘𝅥𝅰'].indexOf(glyph);if(i>=0){const b=document.querySelector<HTMLButtonElement>(`.duration-grid button:nth-child(${i+1})`);b?.click()}}else if(activeGroup==='accidentals'){const map:Record<string,string>={'♯':'#','♭':'b','♮':'n','𝄪':'#','𝄫':'b'};const s=document.querySelector<HTMLSelectElement>('#accidental');if(s&&map[glyph]){s.value=map[glyph];s.dispatchEvent(new Event('change',{bubbles:true}))}else{const idx=({'♯':1,'♭':2,'♮':3,'𝄪':1,'𝄫':2} as Record<string,number>)[glyph];document.querySelectorAll<HTMLButtonElement>('.accidental-grid button')[idx]?.click()}}else if(activeGroup==='clefs'){const map:Record<string,string>={'𝄞':'treble','𝄢':'bass','𝄡':'alto','𝄥':'treble'};if(map[glyph])setNativeSelect('clef',map[glyph])}else if(activeGroup==='dynamics'){const s=document.getElementById('dynamic') as HTMLSelectElement|null;if(s&&['pp','p','mp','mf','f','ff'].includes(glyph)){s.value=glyph;s.dispatchEvent(new Event('change',{bubbles:true}))}}else if(activeGroup==='time'){const s=document.getElementById('time') as HTMLSelectElement|null;if(s&&['3/4','4/4','6/8'].includes(glyph)){s.value=glyph;s.dispatchEvent(new Event('change',{bubbles:true}))}}}}>{glyph}<small>{label}</small></button>)}</div>
+        <div className="notation-rail-items">{(SYMBOL_GROUPS.find(g=>g.id===activeGroup)?.items??[]).map(([glyph,label])=><button key={label} title={label} className={selectedSymbol===label?'selected':''} onClick={()=>{setSelectedSymbol(label);if(autoCollapse)setSymbolsOpen(false);if(activeGroup==='notes'){const i=['𝅝','𝅗𝅥','♩','♪','𝅘𝅥𝅯','𝅘𝅥𝅰'].indexOf(glyph);if(i>=0){const b=document.querySelector<HTMLButtonElement>(`.duration-grid button:nth-child(${i+1})`);b?.click()}}else if(activeGroup==='accidentals'){const map:Record<string,string>={'♯':'#','♭':'b','♮':'n','𝄪':'#','𝄫':'b'};const s=document.querySelector<HTMLSelectElement>('#accidental');if(s&&map[glyph]){s.value=map[glyph];s.dispatchEvent(new Event('change',{bubbles:true}))}else{const idx=({'♯':1,'♭':2,'♮':3,'𝄪':1,'𝄫':2} as Record<string,number>)[glyph];document.querySelectorAll<HTMLButtonElement>('.accidental-grid button')[idx]?.click()}}else if(activeGroup==='clefs'){const map:Record<string,string>={'𝄞':'treble','𝄢':'bass','𝄡':'alto','𝄥':'treble'};if(map[glyph])setNativeSelect('clef',map[glyph])}else if(activeGroup==='dynamics'){const s=document.getElementById('dynamic') as HTMLSelectElement|null;if(s&&['pp','p','mp','mf','f','ff'].includes(glyph)){s.value=glyph;s.dispatchEvent(new Event('change',{bubbles:true}))}}else if(activeGroup==='time'){const s=document.getElementById('time') as HTMLSelectElement|null;if(s&&['3/4','4/4','6/8'].includes(glyph)){s.value=glyph;s.dispatchEvent(new Event('change',{bubbles:true}))}}}}><SymbolPreview glyph={glyph} label={label} /><small>{label}</small></button>)}</div>
       </div>}
       {tempoOpen&&<div className="notation-tempo-popover"><label>Tempo · BPM</label><input type="number" min="20" max="300" defaultValue="80" onChange={e=>{const s=document.getElementById('tempo') as HTMLInputElement|null;if(s){s.value=e.target.value;s.dispatchEvent(new Event('input',{bubbles:true}))}}}/><button onClick={()=>setTempoOpen(false)}>Xong</button></div>}
     </div>,toolbarTarget)}
