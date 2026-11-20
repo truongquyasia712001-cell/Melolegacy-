@@ -134,8 +134,8 @@ function App() {
             const stave = new Stave(x, y, measureWidth - measureGap)
             if (bar === 0) {
               stave.addClef(activeClef)
-              stave.addTimeSignature(time)
               if (keySig !== 'C') stave.addKeySignature(keySig)
+              stave.addTimeSignature(time)
             }
             stave.setContext(context).draw()
             const items = grouped.get(staffIndex + ':' + bar) || []
@@ -203,8 +203,26 @@ function App() {
     const name = DIATONIC[((pitchIndex % 7) + 7) % 7]
     const octave = bottom.octave + Math.floor(pitchIndex / 7)
     const key = name + '/' + octave
-    const measureWidth = (viewBox.width - 84) / 4
-    const measure = Math.max(0, Math.min(3, Math.floor((x - 42) / measureWidth)))
+    const measureBudget = viewBox.width - 84
+    const measureWeights = Array.from({ length: 4 }, (_, bar) => {
+      const density = Array.from({ length: systems * stavesPerSystem }, (_, staff) => grouped.get(staff + ':' + bar) || []).flat()
+      const rhythmicLoad = density.reduce((sum, item) => sum + (item.duration === '16' || item.duration === '32' ? 1.7 : item.duration === '8' ? 1.35 : 1) + (item.dotted ? .25 : 0) + (item.accidental ? .2 : 0), 0)
+      return Math.max(bar === 0 ? 1.9 : 1, 1 + rhythmicLoad * .18)
+    })
+    const totalWeight = measureWeights.reduce((a, b) => a + b, 0)
+    const measureWidths = measureWeights.map(value => measureBudget * value / totalWeight)
+    if (measureWidths[0] < Math.min(220, measureBudget * .34)) {
+      const needed = Math.min(220, measureBudget * .34) - measureWidths[0]
+      const remainder = measureWidths.slice(1).reduce((a, b) => a + b, 0)
+      for (let i = 1; i < 4; i++) measureWidths[i] -= needed * measureWidths[i] / remainder
+      measureWidths[0] += needed
+    }
+    let measure = 0
+    let measureStart = 42
+    while (measure < 3 && x >= measureStart + measureWidths[measure]) {
+      measureStart += measureWidths[measure]
+      measure++
+    }
     const current = grouped.get(staffIndex + ':' + measure) || []
     const beatLimit = ((Number(time.split('/')[0]) || 4) * 4) / (Number(time.split('/')[1]) || 4)
     const used = current.reduce((sum, n) => sum + BEATS[n.duration] * (n.dotted ? 1.5 : 1), 0)
