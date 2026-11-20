@@ -259,7 +259,6 @@ export default function App() {
         const a = event.touches[0], b = event.touches[1]
         const distance = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
         setZoom(Math.max(.65, Math.min(2.2, pinchRef.current.zoom * distance / pinchRef.current.distance)))
-        event.preventDefault()
       } else cancelLongPress()
     }}>
     <ComposerRoomBase />
