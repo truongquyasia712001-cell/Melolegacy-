@@ -205,3 +205,24 @@ html,body,#root{width:100%;height:100%;margin:0;overflow:hidden}
  .floating-pen-tools-panel{right:12px;bottom:72px;gap:3px;padding:5px}
  .floating-pen-tools-panel button{width:32px;height:32px}
 }
+
+
+/* Handwriting layer is anchored inside the notation canvas, so scrolling and zoom
+   transform the score and ink together instead of leaving a viewport overlay behind. */
+.notation-host{position:relative!important}
+.pen-layer{position:absolute!important;inset:0!important;top:0!important;left:0!important;width:100%!important;height:100%!important;z-index:12;overflow:hidden!important;pointer-events:none}
+.pen-layer.enabled{pointer-events:auto!important;touch-action:none!important;cursor:crosshair}
+.pen-layer svg{width:100%;height:100%;display:block;touch-action:none}
+.notation-symbol-rail{width:min(760px,calc(100vw - 24px));max-width:calc(100vw - 24px);max-height:min(38dvh,320px);overflow:hidden;box-sizing:border-box}
+.notation-symbol-rail.rail-top,.notation-symbol-rail.rail-bottom{align-items:stretch}
+.notation-rail-items{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(58px,1fr));gap:5px;max-width:100%!important;max-height:220px;overflow:auto!important;overscroll-behavior:contain;padding:2px}
+.notation-rail-items button{min-width:0!important;height:62px!important;min-height:62px!important;gap:2px!important;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important}
+.notation-symbol-glyph{width:30px;height:30px;display:block;flex:0 0 30px;color:#493a22}
+.notation-symbol-text{display:flex;align-items:center;justify-content:center;font:600 17px Georgia,serif;white-space:nowrap}
+.notation-rail-items button small{font-size:8px!important;line-height:1.15;white-space:normal!important;text-align:center}
+@media(max-width:760px){
+ .notation-symbol-rail{width:calc(100vw - 16px);max-height:34dvh;padding:5px}
+ .notation-rail-items{grid-template-columns:repeat(auto-fit,minmax(52px,1fr));max-height:calc(34dvh - 58px)}
+ .notation-rail-items button{height:58px!important;min-height:58px!important}
+ .notation-symbol-glyph{width:27px;height:27px;flex-basis:27px}
+}
