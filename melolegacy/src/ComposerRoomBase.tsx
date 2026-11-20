@@ -83,7 +83,20 @@ function App() {
       const context = renderer.getContext()
       const margin = 42
       const measureGap = 3
-      const measureWidth = (width - margin * 2) / 4
+      const measureBudget = width - margin * 2
+      const measureWidths = Array.from({ length: 4 }, (_, bar) => {
+        const density = Array.from({ length: systems * stavesPerSystem }, (_, staff) => grouped.get(staff + ':' + bar) || []).flat()
+        const rhythmicLoad = density.reduce((sum, item) => sum + (item.duration === '16' || item.duration === '32' ? 1.7 : item.duration === '8' ? 1.35 : 1) + (item.dotted ? .25 : 0) + (item.accidental ? .2 : 0), 0)
+        return Math.max(bar === 0 ? 1.9 : 1, 1 + rhythmicLoad * .18)
+      })
+      const totalWeight = measureWidths.reduce((a, b) => a + b, 0)
+      const widths = measureWidths.map(value => measureBudget * value / totalWeight)
+      if (widths[0] < Math.min(220, measureBudget * .34)) {
+        const needed = Math.min(220, measureBudget * .34) - widths[0]
+        const remainder = widths.slice(1).reduce((a, b) => a + b, 0)
+        for (let i = 1; i < 4; i++) widths[i] -= needed * widths[i] / remainder
+        widths[0] += needed
+      }
       for (let system = 0; system < systems; system++) {
         const baseY = SYSTEM_TOP + system * (layout === 'grand' ? GRAND_GAP : SYSTEM_GAP)
         for (let part = 0; part < stavesPerSystem; part++) {
@@ -91,7 +104,8 @@ function App() {
           const y = baseY + part * 68
           const activeClef = layout === 'grand' ? (part === 0 ? 'treble' : 'bass') : (layout === 'orchestra' && part > 0 ? 'bass' : clef)
           for (let bar = 0; bar < 4; bar++) {
-            const x = margin + bar * measureWidth
+            const x = margin + widths.slice(0, bar).reduce((a, b) => a + b, 0)
+            const measureWidth = widths[bar]
             const stave = new Stave(x, y, measureWidth - measureGap)
             if (bar === 0) {
               stave.addClef(activeClef)
@@ -109,7 +123,7 @@ function App() {
             const voice = new Voice({ numBeats: Number(time.split('/')[0]) || 4, beatValue: Number(time.split('/')[1]) || 4 })
             voice.setMode(Voice.Mode.SOFT)
             voice.addTickables(tickables)
-            new Formatter().joinVoices([voice]).format([voice], measureWidth - 58)
+            new Formatter().joinVoices([voice]).format([voice], Math.max(40, measureWidth - (bar === 0 ? 112 : 28)))
             voice.draw(context, stave)
             const beams = Beam.generateBeams(tickables)
             beams.forEach(beam => beam.setContext(context).draw())
@@ -251,7 +265,7 @@ function App() {
   return <main className="app-shell">
     <header className="topbar">
       <div className="brand"><div className="brand-mark">M</div><div><strong>MeloLegacy</strong><span>PHÒNG SOẠN NHẠC</span></div></div>
-      <div className="top-actions"><span className="save-state"><i />{status}</span><div className="mode-switch"><button className={workspaceMode === 'compose' ? 'active' : ''} onClick={() => setWorkspaceMode('compose')}>Soạn nhạc</button><button className={workspaceMode === 'perform' ? 'active' : ''} onClick={() => setWorkspaceMode('perform')}>Mở trình diễn</button></div><button className="gold-button" onClick={() => window.print()}>Xuất / In</button></div>
+      <div className="top-actions"><span className="save-state"><i />{status}</span><button className="top-icon" aria-label="Kim chỉ nam" title="Kim chỉ nam">⌖</button><button className="top-icon" aria-label="Micro" title="Micro">♩</button><button className="top-icon" aria-label="Camera" title="Camera">▣</button><button className="top-icon" aria-label="Tải lên" title="Tải lên">↑</button><button className="top-icon" aria-label="Xuất" title="Xuất bản nhạc" onClick={() => window.print()}>↓</button><button className="top-icon" aria-label="Recording Room" title="Recording Room">▤</button><div className="mode-switch"><button className={workspaceMode === 'compose' ? 'active' : ''} onClick={() => setWorkspaceMode('compose')}>Soạn</button><button className={workspaceMode === 'perform' ? 'active' : ''} onClick={() => setWorkspaceMode('perform')}>Đọc</button></div></div>
     </header>
     <section className="workspace">
       {workspaceMode === 'compose' && <aside className="tool-panel">
@@ -284,9 +298,9 @@ function App() {
         <div className="panel-foot">Bản nhạc lưu cục bộ trên thiết bị này.</div>
       </aside>}
       <section className="score-area">
-        <div className="score-toolbar"><div><span className="crumb">MeloLegacy</span><span className="slash">/</span><b>Phòng Soạn Nhạc</b></div><div className="reader-actions"><span className="zoom-label">A4 · Dọc · {systems} hệ thống</span><span className="play-state">{playbackStatus}</span><button onClick={playScore}>▶ Trình diễn</button><button onClick={stopPlayback}>■ Dừng</button></div></div>
+        <div className="score-toolbar"><div><span className="crumb">MeloLegacy</span><span className="slash">/</span><b>Phòng Soạn Nhạc</b></div><div className="reader-actions"><span className="zoom-label">A4 · Dọc · {systems} hệ thống</span><span className="play-state">{playbackStatus}</span></div></div>
         <div className="paper-wrap"><div className="paper" style={{ minHeight: paperHeight }}>
-          <div className="paper-head"><div className="paper-kicker">MELOLEGACY · MUSIC COMPOSITION</div><h1>{title || 'Tác phẩm mới'}</h1><div className="paper-meta"><span>Tác giả: __________________</span><span>♩ = {tempo}　{dynamic}</span></div></div>
+          <div className="paper-head"><div className="paper-kicker">MELOLEGACY · MUSIC COMPOSITION</div><h1>{title || 'Tác phẩm mới'}</h1><div className="paper-meta"><span>Tác giả / Nhóm sáng tác: __________________</span><span>Mã tác phẩm: MELO-000001　·　♩ = {tempo}</span></div></div>
           <div className="notation-host" ref={scoreRef} onClick={addFromCanvas} style={{ minHeight: paperHeight - 180 }} />
           <div className="paper-bottom"><span>MeloLegacy · Di sản âm nhạc</span><span>Trang 1</span></div>
         </div></div>
