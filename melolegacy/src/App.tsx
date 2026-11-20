@@ -62,6 +62,32 @@ export default function App() {
 
   useEffect(() => { setToolbarTarget(document.querySelector('.score-toolbar')) }, [])
   useEffect(() => { const onState=(event:Event)=>setPlaying(Boolean((event as CustomEvent).detail)); window.addEventListener('melo:play-state',onState); return ()=>window.removeEventListener('melo:play-state',onState) }, [])
+  useEffect(() => {
+    const onRecord = async () => {
+      if (recording) { recorderRef.current?.stop(); setRecording(false); return }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        const recorder = new MediaRecorder(stream)
+        recorderRef.current = recorder
+        recordChunksRef.current = []
+        recorder.ondataavailable = event => { if (event.data.size) recordChunksRef.current.push(event.data) }
+        recorder.onstop = () => {
+          const blob = new Blob(recordChunksRef.current, { type: recorder.mimeType || 'audio/webm' })
+          const url = URL.createObjectURL(blob)
+          const anchor = document.createElement('a')
+          anchor.href = url
+          anchor.download = 'MeloLegacy-ban-thu-am.webm'
+          anchor.click()
+          URL.revokeObjectURL(url)
+          stream.getTracks().forEach(track => track.stop())
+        }
+        recorder.start()
+        setRecording(true)
+      } catch { alert('MeloLegacy cần quyền truy cập micro để thu âm.') }
+    }
+    window.addEventListener('melo:record', onRecord)
+    return () => window.removeEventListener('melo:record', onRecord)
+  }, [recording])
 
   useEffect(() => {
     const close = (event: PointerEvent) => {
