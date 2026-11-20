@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import './RecognitionStudio.css'
 
 type Stroke = { points: [number, number, number][]; pointer: string }
