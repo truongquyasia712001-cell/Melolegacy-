@@ -42,6 +42,8 @@ export default function App() {
   const [symbolsOpen, setSymbolsOpen] = useState(false)
   const [tempoOpen, setTempoOpen] = useState(false)
   const [recording, setRecording] = useState(false)
+  const [playing, setPlaying] = useState(false)
+  const [autoCollapse, setAutoCollapse] = useState(true)
   const [toolbarTarget, setToolbarTarget] = useState<HTMLElement | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const recordChunksRef = useRef<Blob[]>([])
@@ -59,6 +61,7 @@ export default function App() {
   const timerRef = useRef<number | null>(null)
 
   useEffect(() => { setToolbarTarget(document.querySelector('.score-toolbar')) }, [])
+  useEffect(() => { const onState=(event:Event)=>setPlaying(Boolean((event as CustomEvent).detail)); window.addEventListener('melo:play-state',onState); return ()=>window.removeEventListener('melo:play-state',onState) }, [])
 
   useEffect(() => {
     const close = (event: PointerEvent) => {
@@ -166,7 +169,7 @@ export default function App() {
           <button aria-label="Nhóm ký âm" title="Nhóm ký âm" onClick={()=>{setLibraryOpen(v=>!v);setSymbolsOpen(false);setTempoOpen(false)}}>𝅗𝅥</button>
           <button aria-label="Hoàn tác" title="Hoàn tác" onClick={()=>window.dispatchEvent(new Event('melo:undo'))}>↶</button>
         </div>
-        <button className="command-play-toggle" aria-label="Phát hoặc dừng bản nhạc" title="Phát / Dừng" onClick={()=>window.dispatchEvent(new Event('melo:play-toggle'))}>▶</button>
+        <button className="command-play-toggle" aria-label="Phát hoặc dừng bản nhạc" title="Phát / Dừng" onClick={()=>window.dispatchEvent(new Event('melo:play-toggle'))}>{playing?'Ⅱ':'▶'}</button>
         <div className="command-side command-right">
           <button aria-label="Làm lại" title="Làm lại" onClick={()=>window.dispatchEvent(new Event('melo:redo'))}>↷</button>
           <button className={tempoOpen?'command-active':''} aria-label="Metronome" title="Metronome" onClick={()=>{setTempoOpen(v=>!v);setLibraryOpen(false);setSymbolsOpen(false)}}>♩⌁</button>
@@ -180,8 +183,8 @@ export default function App() {
         <div className="notation-dock-options">{(['top','bottom','left','right'] as const).map(side=><button key={side} className={dock===side?'active':''} onClick={()=>setDock(side)}>{({top:'Trên',bottom:'Dưới',left:'Trái',right:'Phải'} as const)[side]}</button>)}</div>
       </div>}
       {symbolsOpen&&<div className={`notation-symbol-rail rail-${dock}`}>
-        <div className="notation-rail-title"><b>{SYMBOL_GROUPS.find(g=>g.id===activeGroup)?.name}</b><button onClick={()=>setSymbolsOpen(false)}>×</button></div>
-        <div className="notation-rail-items">{(SYMBOL_GROUPS.find(g=>g.id===activeGroup)?.items??[]).map(([glyph,label])=><button key={label} title={label} className={selectedSymbol===label?'selected':''} onClick={()=>{setSelectedSymbol(label);if(activeGroup==='notes'){const i=['𝅝','𝅗𝅥','♩','♪','𝅘𝅥𝅯','𝅘𝅥𝅰'].indexOf(glyph);if(i>=0){const b=document.querySelector<HTMLButtonElement>(`.duration-grid button:nth-child(${i+1})`);b?.click()}}else if(activeGroup==='accidentals'){const map:Record<string,string>={'♯':'#','♭':'b','♮':'n','𝄪':'#','𝄫':'b'};const s=document.querySelector<HTMLSelectElement>('#accidental');if(s&&map[glyph]){s.value=map[glyph];s.dispatchEvent(new Event('change',{bubbles:true}))}else{const idx=({'♯':1,'♭':2,'♮':3,'𝄪':1,'𝄫':2} as Record<string,number>)[glyph];document.querySelectorAll<HTMLButtonElement>('.accidental-grid button')[idx]?.click()}}else if(activeGroup==='clefs'){const map:Record<string,string>={'𝄞':'treble','𝄢':'bass','𝄡':'alto','𝄥':'treble'};if(map[glyph])setNativeSelect('clef',map[glyph])}else if(activeGroup==='dynamics'){const s=document.getElementById('dynamic') as HTMLSelectElement|null;if(s&&['pp','p','mp','mf','f','ff'].includes(glyph)){s.value=glyph;s.dispatchEvent(new Event('change',{bubbles:true}))}}else if(activeGroup==='time'){const s=document.getElementById('time') as HTMLSelectElement|null;if(s&&['3/4','4/4','6/8'].includes(glyph)){s.value=glyph;s.dispatchEvent(new Event('change',{bubbles:true}))}}}}>{glyph}<small>{label}</small></button>)}</div>
+        <div className="notation-rail-title"><b>{SYMBOL_GROUPS.find(g=>g.id===activeGroup)?.name}</b><label className="auto-collapse"><input type="checkbox" checked={autoCollapse} onChange={e=>setAutoCollapse(e.target.checked)}/> Tự thu gọn</label><button onClick={()=>setSymbolsOpen(false)}>×</button></div>
+        <div className="notation-rail-items">{(SYMBOL_GROUPS.find(g=>g.id===activeGroup)?.items??[]).map(([glyph,label])=><button key={label} title={label} className={selectedSymbol===label?'selected':''} onClick={()=>{setSelectedSymbol(label);if(autoCollapse)setSymbolsOpen(false);if(activeGroup==='notes'){const i=['𝅝','𝅗𝅥','♩','♪','𝅘𝅥𝅯','𝅘𝅥𝅰'].indexOf(glyph);if(i>=0){const b=document.querySelector<HTMLButtonElement>(`.duration-grid button:nth-child(${i+1})`);b?.click()}}else if(activeGroup==='accidentals'){const map:Record<string,string>={'♯':'#','♭':'b','♮':'n','𝄪':'#','𝄫':'b'};const s=document.querySelector<HTMLSelectElement>('#accidental');if(s&&map[glyph]){s.value=map[glyph];s.dispatchEvent(new Event('change',{bubbles:true}))}else{const idx=({'♯':1,'♭':2,'♮':3,'𝄪':1,'𝄫':2} as Record<string,number>)[glyph];document.querySelectorAll<HTMLButtonElement>('.accidental-grid button')[idx]?.click()}}else if(activeGroup==='clefs'){const map:Record<string,string>={'𝄞':'treble','𝄢':'bass','𝄡':'alto','𝄥':'treble'};if(map[glyph])setNativeSelect('clef',map[glyph])}else if(activeGroup==='dynamics'){const s=document.getElementById('dynamic') as HTMLSelectElement|null;if(s&&['pp','p','mp','mf','f','ff'].includes(glyph)){s.value=glyph;s.dispatchEvent(new Event('change',{bubbles:true}))}}else if(activeGroup==='time'){const s=document.getElementById('time') as HTMLSelectElement|null;if(s&&['3/4','4/4','6/8'].includes(glyph)){s.value=glyph;s.dispatchEvent(new Event('change',{bubbles:true}))}}}}>{glyph}<small>{label}</small></button>)}</div>
       </div>}
       {tempoOpen&&<div className="notation-tempo-popover"><label>Tempo · BPM</label><input type="number" min="20" max="300" defaultValue="80" onChange={e=>{const s=document.getElementById('tempo') as HTMLInputElement|null;if(s){s.value=e.target.value;s.dispatchEvent(new Event('input',{bubbles:true}))}}}/><button onClick={()=>setTempoOpen(false)}>Xong</button></div>}
     </div>,toolbarTarget)}
