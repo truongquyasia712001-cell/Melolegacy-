@@ -81,6 +81,7 @@ export default function App() {
   const [penMode, setPenMode] = useState(false)
   const [penTool, setPenTool] = useState<'pen'|'eraser'>('pen')
   const [zoom, setZoom] = useState(1)
+  const pinchRef = useRef<{distance:number; zoom:number} | null>(null)
   const [strokes, setStrokes] = useState<string[]>([])
   const [activeStroke, setActiveStroke] = useState('')
   const [timeTop, setTimeTop] = useState(4)
@@ -220,9 +221,22 @@ export default function App() {
     onClickCapture={event => { if (!penMode) openInlineSetting(event) }}
     onDoubleClickCapture={event => { if (!penMode) openClef(event) }}
     onContextMenuCapture={event => { if (!penMode && openClef(event)) event.preventDefault() }}
-    onTouchStartCapture={onLongPressStart}
-    onTouchEndCapture={cancelLongPress}
-    onTouchMoveCapture={cancelLongPress}>
+    onTouchStartCapture={event => {
+      cancelLongPress()
+      if (event.touches.length === 2) {
+        const a = event.touches[0], b = event.touches[1]
+        pinchRef.current = { distance: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), zoom }
+      } else if (event.touches.length === 1 && !penMode) onLongPressStart(event)
+    }}
+    onTouchEndCapture={event => { cancelLongPress(); if (event.touches.length < 2) pinchRef.current = null }}
+    onTouchMoveCapture={event => {
+      if (event.touches.length === 2 && pinchRef.current) {
+        const a = event.touches[0], b = event.touches[1]
+        const distance = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
+        setZoom(Math.max(.65, Math.min(2.2, pinchRef.current.zoom * distance / pinchRef.current.distance)))
+        event.preventDefault()
+      } else cancelLongPress()
+    }}>
     <ComposerRoomBase />
     {toolbarTarget && createPortal(<div className="composer-commandbar">
       <div className="composer-command-main">
