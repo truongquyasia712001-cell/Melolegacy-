@@ -37,7 +37,7 @@ function setNativeSelect(id: string, value: string) {
 }
 
 
-type ToolIconName = 'library'|'note'|'undo'|'redo'|'play'|'pause'|'metronome'|'piano'|'settings'|'compass'|'mic'|'camera'|'upload'|'download'|'recording'|'pen'
+type ToolIconName = 'library'|'note'|'undo'|'redo'|'play'|'pause'|'metronome'|'piano'|'settings'|'compass'|'mic'|'camera'|'upload'|'download'|'recording'|'pen'|'eraser'|'trash'|'zoomIn'|'zoomOut'
 function ToolIcon({name}:{name:ToolIconName}) {
   const paths: Record<ToolIconName,string[]> = {
     library:['M4 5.5A1.5 1.5 0 0 1 5.5 4H20v15H5.5A1.5 1.5 0 0 0 4 20z','M4 7h16','M8 4v3'],
@@ -55,7 +55,11 @@ function ToolIcon({name}:{name:ToolIconName}) {
     upload:['M12 16V3','m7 8 5-5 5 5','M4 15v5h16v-5'],
     download:['M12 3v13','m7 11 5 5 5-5','M4 17v4h16v-4'],
     recording:['M4 6h16v12H4z','M8 10v4','M11 8v8','M14 10v4','M17 9v6'],
-    pen:['m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10z','m14 7 3 3','M4 20h6']
+    pen:['m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10z','m14 7 3 3','M4 20h6'],
+    eraser:['m7 20-4-4a2 2 0 0 1 0-3l8-9a2 2 0 0 1 3 0l7 7a2 2 0 0 1 0 3l-5 6z','m8 11 7 7','M11 20h10'],
+    trash:['M4 7h16','M10 11v6','M14 11v6','M6 7l1 14h10l1-14','M9 7V4h6v3'],
+    zoomIn:['M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z','M11 8v6','M8 11h6','m16 16 5 5'],
+    zoomOut:['M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z','M8 11h6','m16 16 5 5']
   }
   return <svg className="tool-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">{paths[name].map((d,i)=><path key={i} d={d}/>)}</svg>
 }
@@ -75,6 +79,8 @@ export default function App() {
   const [dock, setDock] = useState<'top'|'bottom'|'left'|'right'>('bottom')
   const [selectedSymbol, setSelectedSymbol] = useState('')
   const [penMode, setPenMode] = useState(false)
+  const [penTool, setPenTool] = useState<'pen'|'eraser'>('pen')
+  const [zoom, setZoom] = useState(1)
   const [strokes, setStrokes] = useState<string[]>([])
   const [activeStroke, setActiveStroke] = useState('')
   const [timeTop, setTimeTop] = useState(4)
@@ -185,18 +191,24 @@ export default function App() {
     timerRef.current = null
   }
 
+  function eraseAt(event: React.PointerEvent<SVGSVGElement>) {
+    const rect=event.currentTarget.getBoundingClientRect()
+    const x=((event.clientX-rect.left)/rect.width)*1000, y=((event.clientY-rect.top)/rect.height)*1000
+    setStrokes(current=>current.filter(stroke=>!stroke.trim().split(/\s+/).some(pair=>{const [px,py]=pair.split(',').map(Number);return Number.isFinite(px)&&Math.hypot(px-x,py-y)<48})))
+  }
   function drawStart(event: React.PointerEvent<SVGSVGElement>) {
     if (!penMode) return
-    const rect = event.currentTarget.getBoundingClientRect()
-    const point = `${((event.clientX - rect.left) / rect.width) * 1000},${((event.clientY - rect.top) / rect.height) * 1000}`
     event.currentTarget.setPointerCapture(event.pointerId)
-    setActiveStroke(point)
+    if (penTool==='eraser') { eraseAt(event); return }
+    const rect=event.currentTarget.getBoundingClientRect()
+    setActiveStroke(((event.clientX-rect.left)/rect.width*1000)+','+((event.clientY-rect.top)/rect.height*1000))
   }
   function drawMove(event: React.PointerEvent<SVGSVGElement>) {
-    if (!penMode || !activeStroke || event.buttons === 0) return
-    const rect = event.currentTarget.getBoundingClientRect()
-    const point = `${((event.clientX - rect.left) / rect.width) * 1000},${((event.clientY - rect.top) / rect.height) * 1000}`
-    setActiveStroke(value => value + ' ' + point)
+    if (!penMode || event.buttons===0) return
+    if (penTool==='eraser') { eraseAt(event); return }
+    if (!activeStroke) return
+    const rect=event.currentTarget.getBoundingClientRect()
+    setActiveStroke(value=>value+' '+((event.clientX-rect.left)/rect.width*1000)+','+((event.clientY-rect.top)/rect.height*1000))
   }
   function drawEnd() {
     if (activeStroke) setStrokes(value => [...value, activeStroke])
@@ -242,8 +254,17 @@ export default function App() {
       <button className={penMode ? 'pen-toggle active' : 'pen-toggle'} onClick={() => { setPenMode(value => !value); setPopup(null) }}>✎ {penMode ? 'Đang viết' : 'Bút viết'}</button>
       {penMode && <button className="pen-clear" onClick={() => setStrokes([])}>Xóa nét</button>}
     </div>
+    {penMode && <div className="floating-pen-tools-panel" role="group" aria-label="Công cụ bút viết">
+      <button className={penTool === "pen" ? "active" : ""} aria-label="Bút viết" title="Bút viết" onClick={() => setPenTool("pen")}><ToolIcon name="pen" /></button>
+      <button className={penTool === "eraser" ? "active" : ""} aria-label="Tẩy nét" title="Tẩy nét viết" onClick={() => setPenTool("eraser")}><ToolIcon name="eraser" /></button>
+      <button aria-label="Xóa toàn bộ nét viết" title="Xóa toàn bộ nét viết" onClick={() => { if (window.confirm("Xóa toàn bộ nét viết tay?")) { setStrokes([]); setActiveStroke("") } }}><ToolIcon name="trash" /></button>
+      <i />
+      <button aria-label="Thu nhỏ" title="Thu nhỏ bản nhạc" onClick={() => setZoom(v => Math.max(.65, Number((v - .1).toFixed(2))))}><ToolIcon name="zoomOut" /></button>
+      <span>{Math.round(zoom * 100)}%</span>
+      <button aria-label="Phóng to" title="Phóng to bản nhạc" onClick={() => setZoom(v => Math.min(2.2, Number((v + .1).toFixed(2))))}><ToolIcon name="zoomIn" /></button>
+    </div>}
     <div className="floating-pen-anchor">
-      <button className={penMode?'floating-pen active':'floating-pen'} aria-label="Bút nổi" title="Bút nổi" onClick={()=>{setPenMode(true);setSymbolsOpen(v=>!v);setLibraryOpen(false)}}><ToolIcon name="pen" /></button>
+      <button className={penMode ? "floating-pen active" : "floating-pen"} aria-label="Bút nổi" title="Bút nổi" onClick={() => { setPenMode(true); setPenTool("pen"); setActiveGroup("notes"); setSymbolsOpen(true); setLibraryOpen(false) }}><ToolIcon name="pen" /></button>
     </div>
     <div className={penMode ? 'pen-layer enabled' : 'pen-layer'} aria-label="Lớp viết tay trên khuông nhạc">
       <svg viewBox="0 0 1000 1000" preserveAspectRatio="none"
