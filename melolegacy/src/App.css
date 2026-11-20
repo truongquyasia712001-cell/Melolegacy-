@@ -96,3 +96,42 @@ html,body,#root{width:100%;height:100%;margin:0;overflow:hidden}
 .notation-tempo-popover button{border:0;background:#a9823e;color:#fff;border-radius:6px;padding:6px 8px}
 .notation-library-trigger,.notation-library{display:none!important}
 @media(max-width:760px){.score-toolbar{padding-left:7px!important;padding-right:7px!important}.composer-commandbar{left:auto;right:8px;transform:translateY(-50%)}.composer-command-main{gap:2px;padding:2px 4px}.composer-command-main>button{width:30px;height:30px;font-size:19px}.notation-category-popover{left:auto;right:0;width:min(300px,calc(100vw - 18px))}.notation-symbol-rail.rail-top{top:132px}.notation-symbol-rail.rail-bottom{bottom:8px}.notation-symbol-rail.rail-left{left:5px}.notation-symbol-rail.rail-right{right:5px}.notation-rail-items{max-width:calc(100vw - 32px)}}
+
+
+/* Approved Composer Room toolbar: one play/pause control at the exact center */
+.topbar{background:#14243a!important;color:#f8f2e6!important;border-bottom:1px solid #8d713e!important}
+.brand strong{color:#fff8e8!important}.brand span{color:#e2c27b!important}
+.brand-mark{background:linear-gradient(145deg,#e3c77e,#a77a2e)!important;color:#17263b!important}
+.top-icon{width:32px;height:32px;border:1px solid #6e5a36;border-radius:50%;background:#1d3048;color:#e5c77f;font-size:18px;display:grid;place-items:center}
+.top-icon:hover{background:#30435a}
+.top-actions{gap:7px!important}
+.score-toolbar{position:sticky!important;top:0!important;z-index:70!important;min-height:58px!important;background:#f7f3ea!important;border-bottom:1px solid #e4d8c1}
+.composer-commandbar{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(820px,calc(100% - 250px));display:flex;align-items:center;justify-content:center;z-index:100;pointer-events:none}
+.composer-command-main{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 8px;border:0;background:transparent;box-shadow:none;pointer-events:auto}
+.command-side{display:flex;align-items:center;gap:clamp(4px,1vw,14px)}
+.command-side>button{width:38px;height:38px;border:1px solid #39352e;border-radius:50%;background:#fffdf8;color:#a47b2e;font-size:21px;display:grid;place-items:center;box-shadow:0 1px 3px #1c160c12}
+.command-side>button.command-active{background:#f1e4c8;border-color:#a9823e}
+.command-play-toggle{width:48px;height:48px;flex:0 0 48px;border:2px solid #9b762f;border-radius:50%;background:linear-gradient(145deg,#f6e8c7,#d8b56b);color:#26354a;font-size:22px;font-weight:700;display:grid;place-items:center;box-shadow:0 3px 10px #6e51251f}
+.command-play-toggle:active{transform:scale(.96)}
+.floating-pen-anchor{position:fixed;right:22px;bottom:24px;z-index:130}
+.floating-pen{width:58px;height:58px;border:1px solid #9f7b3c;border-radius:50%;background:linear-gradient(145deg,#f5e4b9,#caa34f);color:#26354a;font-size:30px;box-shadow:0 5px 18px #2d241833;touch-action:none}
+.floating-pen.active{box-shadow:0 0 0 4px #d9bd7a66,0 5px 18px #2d241833}
+.notation-symbol-rail{background:#fffefa}
+.notation-rail-title{gap:12px}
+.auto-collapse{display:flex;align-items:center;gap:4px;font:9px Inter,sans-serif;color:#806334;white-space:nowrap}
+.auto-collapse input{accent-color:#a9823e}
+.notation-symbol-rail.rail-top{top:112px;bottom:auto}
+.notation-symbol-rail.rail-bottom{bottom:90px}
+.notation-symbol-rail.rail-left{left:10px}
+.notation-symbol-rail.rail-right{right:10px}
+.paper{background:#fff!important}
+@media(max-width:760px){
+ .topbar{padding:0 7px!important}.top-actions{gap:3px!important}.top-icon{width:27px;height:27px;font-size:15px}
+ .mode-switch{display:none!important}.composer-commandbar{width:calc(100% - 18px);top:50%;left:50%;transform:translate(-50%,-50%)}
+ .composer-command-main{gap:3px;padding:0 2px}.command-side{gap:3px}
+ .command-side>button{width:30px;height:30px;font-size:17px}
+ .command-play-toggle{width:42px;height:42px;flex-basis:42px;font-size:19px}
+ .score-toolbar>div:first-child{opacity:.25;max-width:75px;overflow:hidden;white-space:nowrap}
+ .floating-pen-anchor{right:12px;bottom:14px}.floating-pen{width:50px;height:50px;font-size:26px}
+ .notation-symbol-rail.rail-top{top:104px}.notation-symbol-rail.rail-bottom{bottom:76px}
+}
