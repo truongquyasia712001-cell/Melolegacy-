@@ -36,6 +36,30 @@ function setNativeSelect(id: string, value: string) {
   select.dispatchEvent(new Event('change', { bubbles: true }))
 }
 
+
+type ToolIconName = 'library'|'note'|'undo'|'redo'|'play'|'pause'|'metronome'|'piano'|'settings'|'compass'|'mic'|'camera'|'upload'|'download'|'recording'|'pen'
+function ToolIcon({name}:{name:ToolIconName}) {
+  const paths: Record<ToolIconName,string[]> = {
+    library:['M4 5.5A1.5 1.5 0 0 1 5.5 4H20v15H5.5A1.5 1.5 0 0 0 4 20z','M4 7h16','M8 4v3'],
+    note:['M9 18V5l11-2v13','M9 18a3 2 0 1 1-3-2 3 2 0 0 1 3 2','M20 16a3 2 0 1 1-3-2 3 2 0 0 1 3 2'],
+    undo:['M9 14 4 9l5-5','M4 9h9a7 7 0 0 1 0 14h-2'],
+    redo:['m15 14 5-5-5-5','M20 9h-9a7 7 0 0 0 0 14h2'],
+    play:['m8 5 11 7-11 7z'],
+    pause:['M8 5v14','M16 5v14'],
+    metronome:['m5 20 4-16h6l4 16z','M12 5v9l4-4','M7 20h10'],
+    piano:['M4 5h16v14H4z','M8 5v8','M12 5v8','M16 5v8','M8 13v6','M16 13v6'],
+    settings:['M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z','M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-1.7 1.7-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5v.2h-2.4v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1L8 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H6.7v-2.4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9L8 8.6l1.7-1.7.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5v-.2h2.4v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1 1.7 1.7-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.2V14h-.2a1.7 1.7 0 0 0-1.5 1z'],
+    compass:['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z','m15.5 8.5-2.2 4.8-4.8 2.2 2.2-4.8z'],
+    mic:['M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z','M19 11a7 7 0 0 1-14 0','M12 18v4','M8 22h8'],
+    camera:['M4 7h4l2-2h4l2 2h4v12H4z','M12 10a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z'],
+    upload:['M12 16V3','m7 8 5-5 5 5','M4 15v5h16v-5'],
+    download:['M12 3v13','m7 11 5 5 5-5','M4 17v4h16v-4'],
+    recording:['M4 6h16v12H4z','M8 10v4','M11 8v8','M14 10v4','M17 9v6'],
+    pen:['m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10z','m14 7 3 3','M4 20h6']
+  }
+  return <svg className="tool-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">{paths[name].map((d,i)=><path key={i} d={d}/>)}</svg>
+}
+
 export default function App() {
   const [popup, setPopup] = useState<Popup>(null)
   const [libraryOpen, setLibraryOpen] = useState(false)
@@ -191,16 +215,16 @@ export default function App() {
     {toolbarTarget && createPortal(<div className="composer-commandbar">
       <div className="composer-command-main">
         <div className="command-side command-left">
-          <button className={libraryOpen?'command-active':''} aria-label="Thư viện ký hiệu" title="Thư viện ký hiệu" onClick={()=>{setLibraryOpen(v=>!v);setSymbolsOpen(false);setTempoOpen(false)}}>▦</button>
-          <button aria-label="Nhóm ký âm" title="Nhóm ký âm" onClick={()=>{setLibraryOpen(v=>!v);setSymbolsOpen(false);setTempoOpen(false)}}>𝅗𝅥</button>
-          <button aria-label="Hoàn tác" title="Hoàn tác" onClick={()=>window.dispatchEvent(new Event('melo:undo'))}>↶</button>
+          <button className={libraryOpen?'command-active':''} aria-label="Thư viện ký hiệu" title="Thư viện ký hiệu" onClick={()=>{setLibraryOpen(v=>!v);setSymbolsOpen(false);setTempoOpen(false)}} ><ToolIcon name="library" /></button>
+          <button aria-label="Nhóm ký âm" title="Nhóm ký âm" onClick={()=>{setLibraryOpen(v=>!v);setSymbolsOpen(false);setTempoOpen(false)}} ><ToolIcon name="note" /></button>
+          <button aria-label="Hoàn tác" title="Hoàn tác" onClick={()=>window.dispatchEvent(new Event('melo:undo'))} ><ToolIcon name="undo" /></button>
         </div>
-        <button className="command-play-toggle" aria-label="Phát hoặc dừng bản nhạc" title="Phát / Dừng" onClick={()=>window.dispatchEvent(new Event('melo:play-toggle'))}>{playing?'Ⅱ':'▶'}</button>
+        <button className="command-play-toggle" aria-label="Phát hoặc dừng bản nhạc" title="Phát / Dừng" onClick={()=>window.dispatchEvent(new Event('melo:play-toggle'))}>{playing?<ToolIcon name="pause" />:<ToolIcon name="play" />}</button>
         <div className="command-side command-right">
-          <button aria-label="Làm lại" title="Làm lại" onClick={()=>window.dispatchEvent(new Event('melo:redo'))}>↷</button>
-          <button className={tempoOpen?'command-active':''} aria-label="Metronome" title="Metronome" onClick={()=>{setTempoOpen(v=>!v);setLibraryOpen(false);setSymbolsOpen(false)}}>♩⌁</button>
-          <button aria-label="Piano ảo" title="Piano ảo" onClick={()=>window.dispatchEvent(new Event('melo:piano'))}>▥</button>
-          <button aria-label="Cài đặt" title="Cài đặt" onClick={()=>window.dispatchEvent(new Event('melo:settings'))}>⚙</button>
+          <button aria-label="Làm lại" title="Làm lại" onClick={()=>window.dispatchEvent(new Event('melo:redo'))} ><ToolIcon name="redo" /></button>
+          <button className={tempoOpen?'command-active':''} aria-label="Metronome" title="Metronome" onClick={()=>{setTempoOpen(v=>!v);setLibraryOpen(false);setSymbolsOpen(false)}} ><ToolIcon name="metronome" /></button>
+          <button aria-label="Piano ảo" title="Piano ảo" onClick={()=>window.dispatchEvent(new Event('melo:piano'))} ><ToolIcon name="piano" /></button>
+          <button aria-label="Cài đặt" title="Cài đặt" onClick={()=>window.dispatchEvent(new Event('melo:settings'))} ><ToolIcon name="settings" /></button>
         </div>
       </div>
       {libraryOpen&&<div className="notation-category-popover">
@@ -219,7 +243,7 @@ export default function App() {
       {penMode && <button className="pen-clear" onClick={() => setStrokes([])}>Xóa nét</button>}
     </div>
     <div className="floating-pen-anchor">
-      <button className={penMode?'floating-pen active':'floating-pen'} aria-label="Bút nổi" title="Bút nổi" onClick={()=>{setPenMode(true);setSymbolsOpen(v=>!v);setLibraryOpen(false)}}>✎</button>
+      <button className={penMode?'floating-pen active':'floating-pen'} aria-label="Bút nổi" title="Bút nổi" onClick={()=>{setPenMode(true);setSymbolsOpen(v=>!v);setLibraryOpen(false)}}><ToolIcon name="pen" /></button>
     </div>
     <div className={penMode ? 'pen-layer enabled' : 'pen-layer'} aria-label="Lớp viết tay trên khuông nhạc">
       <svg viewBox="0 0 1000 1000" preserveAspectRatio="none"
