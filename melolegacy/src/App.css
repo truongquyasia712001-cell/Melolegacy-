@@ -135,3 +135,12 @@ html,body,#root{width:100%;height:100%;margin:0;overflow:hidden}
  .floating-pen-anchor{right:12px;bottom:14px}.floating-pen{width:50px;height:50px;font-size:26px}
  .notation-symbol-rail.rail-top{top:104px}.notation-symbol-rail.rail-bottom{bottom:76px}
 }
+
+/* Refined vector tool icon system: consistent stroke, optical size and alignment */
+.tool-svg{width:19px;height:19px;display:block;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.top-icon .tool-svg{width:17px;height:17px;stroke-width:1.8}
+.command-side>button .tool-svg{width:19px;height:19px}
+.command-play-toggle .tool-svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2}
+.floating-pen .tool-svg{width:25px;height:25px;stroke-width:1.8}
+.command-side>button,.top-icon,.floating-pen{transition:background .16s ease,border-color .16s ease,box-shadow .16s ease,transform .16s ease}
+.command-side>button:hover,.top-icon:hover{background:#f2e8d5;border-color:#b18a48;box-shadow:0 2px 8px #6b51201a}
