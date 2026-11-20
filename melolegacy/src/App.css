@@ -144,3 +144,42 @@ html,body,#root{width:100%;height:100%;margin:0;overflow:hidden}
 .floating-pen .tool-svg{width:25px;height:25px;stroke-width:1.8}
 .command-side>button,.top-icon,.floating-pen{transition:background .16s ease,border-color .16s ease,box-shadow .16s ease,transform .16s ease}
 .command-side>button:hover,.top-icon:hover{background:#f2e8d5;border-color:#b18a48;box-shadow:0 2px 8px #6b51201a}
+
+
+/* User-approved correction: keep the complete tool cluster compact and centered around Play/Pause. */
+.composer-commandbar{
+  left:50%!important;
+  right:auto!important;
+  width:max-content!important;
+  max-width:calc(100vw - 16px)!important;
+  transform:translate(-50%,-50%)!important;
+}
+.composer-command-main{
+  width:max-content!important;
+  max-width:100%!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:7px!important;
+  padding:3px 7px!important;
+}
+.command-side{
+  display:flex!important;
+  flex:0 0 auto!important;
+  align-items:center!important;
+  gap:5px!important;
+}
+.command-play-toggle{flex:0 0 42px!important;margin:0 2px!important}
+@media(max-width:760px){
+  .composer-commandbar{
+    left:50%!important;
+    right:auto!important;
+    width:max-content!important;
+    max-width:calc(100vw - 12px)!important;
+    transform:translate(-50%,-50%)!important;
+  }
+  .composer-command-main{gap:4px!important;padding:2px 4px!important}
+  .command-side{gap:2px!important}
+  .command-side>button{width:29px!important;height:30px!important}
+  .command-play-toggle{width:38px!important;height:38px!important;flex-basis:38px!important;margin:0 1px!important}
+}
