@@ -41,7 +41,6 @@ export default function RecognitionStudio() {
   const [musicXml,setMusicXml]=useState('')
   const [correction,setCorrection]=useState('half')
   const activeRef=useRef(false)
-  const recognized=useMemo(()=>guesses.length,[guesses])
   function point(e:React.PointerEvent<SVGSVGElement>):[number,number,number] {
     const rect=e.currentTarget.getBoundingClientRect()
     return [(e.clientX-rect.left)*1000/rect.width,(e.clientY-rect.top)*700/rect.height,Date.now()]
