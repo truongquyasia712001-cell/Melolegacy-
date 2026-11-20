@@ -161,10 +161,18 @@ export default function App() {
     <ComposerRoomBase />
     {toolbarTarget && createPortal(<div className="composer-commandbar">
       <div className="composer-command-main">
-        <button className={libraryOpen?'command-active':''} aria-label="Thư viện ký hiệu" title="Thư viện ký hiệu" onClick={()=>{setLibraryOpen(v=>!v);setSymbolsOpen(false);setTempoOpen(false)}}>𝅗𝅥</button>
-        <button className={penMode?'command-active':''} aria-label="Bút viết" title="Bút viết" onClick={()=>{setPenMode(v=>!v);setLibraryOpen(false);setSymbolsOpen(false)}}>✎</button>
-        <button className={recording?'command-recording':''} aria-label="Thu âm" title="Thu âm" onClick={async()=>{if(recording){recorderRef.current?.stop();setRecording(false);return}try{const stream=await navigator.mediaDevices.getUserMedia({audio:true});const recorder=new MediaRecorder(stream);recorderRef.current=recorder;recordChunksRef.current=[];recorder.ondataavailable=e=>{if(e.data.size)recordChunksRef.current.push(e.data)};recorder.onstop=()=>{const blob=new Blob(recordChunksRef.current,{type:recorder.mimeType||'audio/webm'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='MeloLegacy-ban-thu-am.webm';a.click();URL.revokeObjectURL(url);stream.getTracks().forEach(t=>t.stop())};recorder.start();setRecording(true)}catch{alert('MeloLegacy cần quyền truy cập micro để thu âm.')}}}>{recording?'●':'🎙'}</button>
-        <button className={tempoOpen?'command-active':''} aria-label="Máy nhịp" title="Máy nhịp" onClick={()=>{setTempoOpen(v=>!v);setLibraryOpen(false);setSymbolsOpen(false)}}>♩⌁</button>
+        <div className="command-side command-left">
+          <button className={libraryOpen?'command-active':''} aria-label="Thư viện ký hiệu" title="Thư viện ký hiệu" onClick={()=>{setLibraryOpen(v=>!v);setSymbolsOpen(false);setTempoOpen(false)}}>▦</button>
+          <button aria-label="Nhóm ký âm" title="Nhóm ký âm" onClick={()=>{setLibraryOpen(v=>!v);setSymbolsOpen(false);setTempoOpen(false)}}>𝅗𝅥</button>
+          <button aria-label="Hoàn tác" title="Hoàn tác" onClick={()=>window.dispatchEvent(new Event('melo:undo'))}>↶</button>
+        </div>
+        <button className="command-play-toggle" aria-label="Phát hoặc dừng bản nhạc" title="Phát / Dừng" onClick={()=>window.dispatchEvent(new Event('melo:play-toggle'))}>▶</button>
+        <div className="command-side command-right">
+          <button aria-label="Làm lại" title="Làm lại" onClick={()=>window.dispatchEvent(new Event('melo:redo'))}>↷</button>
+          <button className={tempoOpen?'command-active':''} aria-label="Metronome" title="Metronome" onClick={()=>{setTempoOpen(v=>!v);setLibraryOpen(false);setSymbolsOpen(false)}}>♩⌁</button>
+          <button aria-label="Piano ảo" title="Piano ảo" onClick={()=>window.dispatchEvent(new Event('melo:piano'))}>▥</button>
+          <button aria-label="Cài đặt" title="Cài đặt" onClick={()=>window.dispatchEvent(new Event('melo:settings'))}>⚙</button>
+        </div>
       </div>
       {libraryOpen&&<div className="notation-category-popover">
         <div className="notation-popover-heading"><b>Nhóm ký hiệu</b><button onClick={()=>setLibraryOpen(false)}>×</button></div>
@@ -180,6 +188,9 @@ export default function App() {
     <div className="composer-pen-tools" style={{display:"none"}}>
       <button className={penMode ? 'pen-toggle active' : 'pen-toggle'} onClick={() => { setPenMode(value => !value); setPopup(null) }}>✎ {penMode ? 'Đang viết' : 'Bút viết'}</button>
       {penMode && <button className="pen-clear" onClick={() => setStrokes([])}>Xóa nét</button>}
+    </div>
+    <div className="floating-pen-anchor">
+      <button className={penMode?'floating-pen active':'floating-pen'} aria-label="Bút nổi" title="Bút nổi" onClick={()=>{setPenMode(true);setSymbolsOpen(v=>!v);setLibraryOpen(false)}}>✎</button>
     </div>
     <div className={penMode ? 'pen-layer enabled' : 'pen-layer'} aria-label="Lớp viết tay trên khuông nhạc">
       <svg viewBox="0 0 1000 1000" preserveAspectRatio="none"
