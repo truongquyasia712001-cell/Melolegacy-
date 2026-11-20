@@ -35,6 +35,7 @@ function App() {
   const [layout, setLayout] = useState<Layout>('solo')
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('compose')
   const [playbackStatus, setPlaybackStatus] = useState('Sẵn sàng trình diễn')
+  const [isPlaying, setIsPlaying] = useState(false)
   const audioContextRef = useRef<AudioContext | null>(null)
   const [duration, setDuration] = useState<Duration>('q')
   const [dotted, setDotted] = useState(false)
@@ -209,6 +210,8 @@ function App() {
   }
 
   function stopPlayback() {
+    setIsPlaying(false)
+    window.dispatchEvent(new CustomEvent('melo:play-state', { detail: false }))
     const context = audioContextRef.current
     if (context) {
       void context.close()
@@ -223,6 +226,8 @@ function App() {
       return
     }
     stopPlayback()
+    setIsPlaying(true)
+    window.dispatchEvent(new CustomEvent('melo:play-state', { detail: true }))
     const context = new window.AudioContext()
     audioContextRef.current = context
     await context.resume()
@@ -258,9 +263,25 @@ function App() {
         void context.close()
         audioContextRef.current = null
         setPlaybackStatus('Đã trình diễn xong')
+        setIsPlaying(false)
+        window.dispatchEvent(new CustomEvent('melo:play-state', { detail: false }))
       }
     }, Math.max(0, (cursor - context.currentTime) * 1000 + 100))
   }
+
+  useEffect(() => {
+    const onPlay = () => { if (isPlaying) stopPlayback(); else void playScore() }
+    const onUndo = () => undo()
+    const onRedo = () => redo()
+    window.addEventListener('melo:play-toggle', onPlay)
+    window.addEventListener('melo:undo', onUndo)
+    window.addEventListener('melo:redo', onRedo)
+    return () => {
+      window.removeEventListener('melo:play-toggle', onPlay)
+      window.removeEventListener('melo:undo', onUndo)
+      window.removeEventListener('melo:redo', onRedo)
+    }
+  }, [isPlaying, notes, history, future, tempo])
 
   return <main className="app-shell">
     <header className="topbar">
