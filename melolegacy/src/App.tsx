@@ -119,6 +119,7 @@ export default function App() {
   const [penTool, setPenTool] = useState<'pen'|'eraser'>('pen')
   const [zoom, setZoom] = useState(1)
   const pinchRef = useRef<{distance:number; zoom:number} | null>(null)
+  const touchCountRef = useRef(0)
   const [strokes, setStrokes] = useState<string[]>([])
   const [activeStroke, setActiveStroke] = useState('')
   const [timeTop, setTimeTop] = useState(4)
@@ -217,13 +218,14 @@ export default function App() {
     setStrokes(current=>current.filter(stroke=>!stroke.trim().split(/\s+/).some(pair=>{const [px,py]=pair.split(',').map(Number);return Number.isFinite(px)&&Math.hypot(px-x,py-y)<48})))
   }
   function drawStart(event: React.PointerEvent<SVGSVGElement>) {
-    if (!penMode) return
+    if (!penMode || (event.pointerType === 'touch' && touchCountRef.current > 1)) return
     event.currentTarget.setPointerCapture(event.pointerId)
     if (penTool==='eraser') { eraseAt(event); return }
     const rect=event.currentTarget.getBoundingClientRect()
     setActiveStroke(((event.clientX-rect.left)/rect.width*1000)+','+((event.clientY-rect.top)/rect.height*1000))
   }
   function drawMove(event: React.PointerEvent<SVGSVGElement>) {
+    if (event.pointerType === 'touch' && touchCountRef.current > 1) { setActiveStroke(''); return }
     if (!penMode || event.buttons===0) return
     if (penTool==='eraser') { eraseAt(event); return }
     if (!activeStroke) return
@@ -241,15 +243,19 @@ export default function App() {
     onDoubleClickCapture={event => { if (!penMode) openClef(event) }}
     onContextMenuCapture={event => { if (!penMode && openClef(event)) event.preventDefault() }}
     onTouchStartCapture={event => {
+      touchCountRef.current = event.touches.length
+      if (event.touches.length > 1) setActiveStroke('')
       cancelLongPress()
       if (event.touches.length === 2) {
         const a = event.touches[0], b = event.touches[1]
         pinchRef.current = { distance: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), zoom }
       } else if (event.touches.length === 1 && !penMode) onLongPressStart(event)
     }}
-    onTouchEndCapture={event => { cancelLongPress(); if (event.touches.length < 2) pinchRef.current = null }}
+    onTouchEndCapture={event => { touchCountRef.current = event.touches.length; cancelLongPress(); if (event.touches.length < 2) pinchRef.current = null }}
     onTouchMoveCapture={event => {
+      touchCountRef.current = event.touches.length
       if (event.touches.length === 2 && pinchRef.current) {
+        setActiveStroke('')
         const a = event.touches[0], b = event.touches[1]
         const distance = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
         setZoom(Math.max(.65, Math.min(2.2, pinchRef.current.zoom * distance / pinchRef.current.distance)))
