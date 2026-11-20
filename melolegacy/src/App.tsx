@@ -73,6 +73,7 @@ export default function App() {
   const [playing, setPlaying] = useState(false)
   const [autoCollapse, setAutoCollapse] = useState(true)
   const [toolbarTarget, setToolbarTarget] = useState<HTMLElement | null>(null)
+  const [notationTarget, setNotationTarget] = useState<HTMLElement | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const recordChunksRef = useRef<Blob[]>([])
   const [activeGroup, setActiveGroup] = useState('notes')
@@ -91,7 +92,10 @@ export default function App() {
   const wheelSuppressClickRef = useRef(false)
   const timerRef = useRef<number | null>(null)
 
-  useEffect(() => { setToolbarTarget(document.querySelector('.score-toolbar')) }, [])
+  useEffect(() => {
+    setToolbarTarget(document.querySelector('.score-toolbar'))
+    setNotationTarget(document.querySelector('.notation-host'))
+  }, [])
   useEffect(() => { const onState=(event:Event)=>setPlaying(Boolean((event as CustomEvent).detail)); window.addEventListener('melo:play-state',onState); return ()=>window.removeEventListener('melo:play-state',onState) }, [])
   useEffect(() => {
     const onRecord = async () => {
@@ -128,28 +132,7 @@ export default function App() {
     return () => document.removeEventListener('pointerdown', close)
   }, [])
 
-  useEffect(() => {
-    const layer = document.querySelector<HTMLElement>('.pen-layer')
-    const host = document.querySelector<HTMLElement>('.notation-host')
-    if (!layer || !host) return
-    const place = () => {
-      const rect = host.getBoundingClientRect()
-      layer.style.top = rect.top + 'px'
-      layer.style.left = rect.left + 'px'
-      layer.style.width = rect.width + 'px'
-      layer.style.height = rect.height + 'px'
-    }
-    place()
-    const observer = new ResizeObserver(place)
-    observer.observe(host)
-    window.addEventListener('resize', place)
-    window.addEventListener('scroll', place, true)
-    return () => {
-      observer.disconnect()
-      window.removeEventListener('resize', place)
-      window.removeEventListener('scroll', place, true)
-    }
-  }, [])
+
 
   function locate(event: React.MouseEvent, kind: 'clef' | 'key' | 'time') {
     const target = event.target as Element
@@ -280,13 +263,16 @@ export default function App() {
     <div className="floating-pen-anchor">
       <button className={penMode ? "floating-pen active" : "floating-pen"} aria-label="Bút nổi" title="Bút nổi" onClick={() => { setPenMode(true); setPenTool("pen"); setActiveGroup("notes"); setSymbolsOpen(true); setLibraryOpen(false) }}><ToolIcon name="pen" /></button>
     </div>
-    <div className={penMode ? 'pen-layer enabled' : 'pen-layer'} aria-label="Lớp viết tay trên khuông nhạc">
-      <svg viewBox="0 0 1000 1000" preserveAspectRatio="none"
-        onPointerDown={drawStart} onPointerMove={drawMove} onPointerUp={drawEnd} onPointerCancel={drawEnd}>
-        {strokes.map((stroke, index) => <polyline key={index} points={stroke} fill="none" stroke="#245b9a" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />)}
-        {activeStroke && <polyline points={activeStroke} fill="none" stroke="#245b9a" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
-      </svg>
-    </div>
+    {notationTarget && createPortal(
+      <div className={penMode ? 'pen-layer enabled' : 'pen-layer'} aria-label="Lớp viết tay trên khuông nhạc">
+        <svg viewBox="0 0 1000 1000" preserveAspectRatio="none"
+          onPointerDown={drawStart} onPointerMove={drawMove} onPointerUp={drawEnd} onPointerCancel={drawEnd} onLostPointerCapture={drawEnd}>
+          {strokes.map((stroke, index) => <polyline key={index} points={stroke} fill="none" stroke="#245b9a" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />)}
+          {activeStroke && <polyline points={activeStroke} fill="none" stroke="#245b9a" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
+        </svg>
+      </div>,
+      notationTarget
+    )}
     {popup && <div className="notation-picker" style={{ left: popup.x, top: popup.y }} onPointerDown={event => event.stopPropagation()}>
       <div className="picker-head"><b>{popup.kind === 'clef' ? 'Chọn khóa nhạc' : popup.kind === 'key' ? 'Vòng tròn quãng năm' : 'Số chỉ nhịp'}</b><button onClick={() => setPopup(null)}>×</button></div>
       {popup.kind === 'clef' && <div className="clef-wheel">{CLEFS.map(item => <button key={item.value} onClick={() => { setNativeSelect('clef', item.value); setPopup(null) }}><strong>{item.symbol}</strong><span>{item.label}</span></button>)}</div>}
