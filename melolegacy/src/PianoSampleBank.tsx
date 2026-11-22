@@ -143,7 +143,7 @@ export function PianoSampleBank({ onSaved }: { onSaved: (samples: PianoSample[])
     <button className="mini-tool sample-import" disabled={busy} onClick={() => inputRef.current?.click()}>＋　Nạp bản thu piano riêng</button>
     {fileName && <div className="sample-file-name">{fileName}</div>}
     {samples.length > 0 && <>
-      <div className="sample-summary"><strong>{samples.length} nốt</strong><span>{samples.length === 88 ? 'A0 – C8' : noteName(samples[0].midi) + ' – ' + noteName(samples[samples.length - 1].midi)}</span></div>
+      <div className="sample-summary"><strong>{samples.length <= 45 ? samples.length + '/45 nốt' : samples.length + ' nốt'}</strong><span>{samples.length === 88 ? 'A0 – C8' : noteName(samples[0].midi) + ' – ' + noteName(samples[samples.length - 1].midi)}</span></div>
       <div className="sample-note-grid">{samples.filter((_, index) => samples.length <= 45 || index % 2 === 0).map(sample => <button type="button" key={sample.midi} title={'Nghe mẫu ' + noteName(sample.midi)} aria-label={'Nghe ' + noteName(sample.midi)} onClick={() => preview(sample)}>{noteName(sample.midi)}</button>)}</div>
       <button className="gold-button sample-save" disabled={busy} onClick={save}>Lưu bộ sample trên thiết bị</button>
     </>}
