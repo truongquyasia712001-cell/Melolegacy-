@@ -41,7 +41,7 @@ test('PDF OMR result imports MusicXML into the editable score', async ({ page })
   await page.locator('input[type="file"][accept*="pdf"]').setInputFiles({
     name: 'omr-fixture.pdf',
     mimeType: 'application/pdf',
-    buffer: Buffer.from('%PDF-1.7\\nPlaywright fixture'),
+    buffer: Buffer.from('%PDF-1.7'),
   })
 
   await expect(page.getByText('Đã nạp 3 ký hiệu từ 1 bè. Anh có thể kiểm tra và chỉnh sửa trên khuông nhạc.')).toBeVisible({ timeout: 10000 })
