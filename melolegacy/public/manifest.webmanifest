@@ -2,14 +2,14 @@
   "id": "/",
   "name": "MeloLegacy – Phòng Soạn Nhạc",
   "short_name": "MeloLegacy",
-  "description": "Không gian soạn nhạc của MeloLegacy",
+  "description": "Phòng Soạn Nhạc MeloLegacy – không gian sáng tác và học nhạc.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#f1eee8",
-  "theme_color": "#a9823e",
+  "background_color": "#07152f",
+  "theme_color": "#b88736",
   "icons": [
-    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "/apple-touch-icon.jpg", "sizes": "128x128", "type": "image/jpeg", "purpose": "any" }
   ]
 }
