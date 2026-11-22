@@ -38,15 +38,17 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin) return;
 
   if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request).then(response => {
+    event.respondWith((async () => {
+      try {
+        const response = await fetch(request);
         if (response.ok && url.pathname === '/') {
-          const copy = response.clone();
-          event.waitUntil(caches.open(SHELL_CACHE).then(cache => cache.put('/', copy)));
+          await caches.open(SHELL_CACHE).then(cache => cache.put('/', response.clone()));
         }
         return response;
-      }).catch(() => caches.match('/')),
-    );
+      } catch {
+        return caches.match('/');
+      }
+    })());
     return;
   }
 
@@ -54,18 +56,17 @@ self.addEventListener('fetch', event => {
   // immutable same-origin files so a previously opened app can start offline.
   if (url.pathname.startsWith('/assets/') &&
       ['script', 'style', 'worker', 'font', 'image'].includes(request.destination)) {
-    event.respondWith(
-      caches.open(ASSET_CACHE).then(async cache => {
-        const cached = await cache.match(request);
-        if (cached) return cached;
+    event.respondWith((async () => {
+      const cache = await caches.open(ASSET_CACHE);
+      const cached = await cache.match(request);
+      if (cached) return cached;
 
-        const response = await fetch(request);
-        if (response.ok && response.type === 'basic') {
-          const copy = response.clone();
-          event.waitUntil(cache.put(request, copy).then(() => trimAssetCache(cache)));
-        }
-        return response;
-      }),
-    );
+      const response = await fetch(request);
+      if (response.ok && response.type === 'basic') {
+        await cache.put(request, response.clone());
+        await trimAssetCache(cache);
+      }
+      return response;
+    })());
   }
 });
