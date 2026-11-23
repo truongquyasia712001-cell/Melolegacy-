@@ -127,7 +127,6 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem('melo-composer-notes-v2', JSON.stringify(notes))
-    setStatus('Đã lưu trên thiết bị')
   }, [notes])
 
   const grouped = useMemo(() => {
@@ -279,6 +278,7 @@ function App() {
     setHistory(prev => [...prev, notes])
     setFuture([])
     setNotes(next)
+    setStatus('Đã lưu trên thiết bị')
   }
 
   function addFromCanvas(event: React.MouseEvent<HTMLDivElement>) {
