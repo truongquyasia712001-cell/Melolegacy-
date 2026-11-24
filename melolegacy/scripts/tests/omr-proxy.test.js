@@ -185,3 +185,53 @@ test('forwards a validated MusicXML result path without accepting a client token
     restoreEnvironment(previous)
   }
 })
+
+
+test('fails closed when server-side OMR credentials are missing', async () => {
+  const previous = saveEnvironment()
+  let fetchCalled = false
+  try {
+    delete process.env.OMR_SERVICE_URL
+    delete process.env.OMR_API_TOKEN
+    globalThis.fetch = async () => { fetchCalled = true; return new Response('{}') }
+    const response = makeResponse()
+    await handler(makeRequest({ path: ['jobs', JOB_ID] }), response)
+    assert.equal(response.statusCode, 503)
+    assert.equal(response.headers['cache-control'], 'no-store')
+    assert.equal(fetchCalled, false)
+  } finally {
+    restoreEnvironment(previous)
+  }
+})
+
+test('rejects non-HTTP OMR service URLs before contacting the upstream', async () => {
+  const previous = saveEnvironment()
+  let fetchCalled = false
+  try {
+    configureService()
+    process.env.OMR_SERVICE_URL = 'file:///tmp/omr'
+    globalThis.fetch = async () => { fetchCalled = true; return new Response('{}') }
+    const response = makeResponse()
+    await handler(makeRequest({ path: ['jobs', JOB_ID] }), response)
+    assert.equal(response.statusCode, 503)
+    assert.equal(fetchCalled, false)
+  } finally {
+    restoreEnvironment(previous)
+  }
+})
+
+test('rejects credential-bearing OMR service URLs before contacting the upstream', async () => {
+  const previous = saveEnvironment()
+  let fetchCalled = false
+  try {
+    configureService()
+    process.env.OMR_SERVICE_URL = 'https://user:password@omr.internal'
+    globalThis.fetch = async () => { fetchCalled = true; return new Response('{}') }
+    const response = makeResponse()
+    await handler(makeRequest({ path: ['jobs', JOB_ID] }), response)
+    assert.equal(response.statusCode, 503)
+    assert.equal(fetchCalled, false)
+  } finally {
+    restoreEnvironment(previous)
+  }
+})
