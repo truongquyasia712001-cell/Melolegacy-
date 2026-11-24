@@ -22,6 +22,7 @@ jobs:
           cache-dependency-path: melolegacy/package-lock.json
       - run: npm install
       - run: npm install --no-save @playwright/test
+      - run: node --test scripts/tests/omr-proxy.test.js
       - run: npx playwright install --with-deps webkit chromium
       - run: npm run build
       - run: npx playwright test
