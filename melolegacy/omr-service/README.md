@@ -10,11 +10,13 @@ PDF-to-MusicXML worker service using the official Audiveris 5.11.0 Linux package
 - `GET /v1/jobs/{id}/result` — ZIP containing the MusicXML/MXL outputs.
 - `GET /v1/jobs/{id}/musicxml` — extracts and returns the first MusicXML score for direct import into Composer Room.
 
-The worker invokes Audiveris in headless batch mode:
+The worker invokes Audiveris in headless batch mode and enables parallel processing of systems by default:
 
 ```sh
-Audiveris -batch -export -save -output OUTPUT_DIR -- INPUT.pdf
+Audiveris -constant org.audiveris.omr.ui.action.AdvancedTopics$Constants.processSystemsInParallel=true -batch -export -save -output OUTPUT_DIR -- INPUT.pdf
 ```
+
+Audiveris documents this option as applying to 13 of 20 processing steps, with approximately 25% overall transcription-time savings. It can make results not strictly reproducible because systems compete when assigning internal entities. Set `OMR_PARALLEL_SYSTEMS=false` to disable it. This is a throughput optimization, not a claim of 90% recognition accuracy; that target must be measured against a representative, human-verified score corpus.
 
 This command and the PDF input format are documented by Audiveris:
 https://audiveris.github.io/audiveris/_pages/guides/advanced/cli/
