@@ -17,26 +17,34 @@ const musicXml = [
 ].join('\n')
 
 test('PDF OMR result imports MusicXML into the editable score', async ({ page }) => {
-  await page.route('**/api/omr/jobs', async route => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ id: 'playwright-omr-fixture' }),
-    })
-  })
-  await page.route('**/api/omr/jobs/playwright-omr-fixture', async route => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ id: 'playwright-omr-fixture', status: 'completed' }),
-    })
-  })
-  await page.route('**/api/omr/jobs/playwright-omr-fixture/musicxml', async route => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/vnd.recordare.musicxml+xml',
-      body: musicXml,
-    })
+  await page.route('**/api/omr/jobs**', async route => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    if (request.method() === 'POST' && path === '/api/omr/jobs') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ id: 'playwright-omr-fixture' }),
+      })
+      return
+    }
+    if (path === '/api/omr/jobs/playwright-omr-fixture') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ id: 'playwright-omr-fixture', status: 'completed' }),
+      })
+      return
+    }
+    if (path === '/api/omr/jobs/playwright-omr-fixture/musicxml') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/vnd.recordare.musicxml+xml',
+        body: musicXml,
+      })
+      return
+    }
+    await route.fulfill({ status: 404, body: 'Unexpected OMR route: ' + request.method() + ' ' + path })
   })
 
   await page.goto('/')
@@ -49,5 +57,5 @@ test('PDF OMR result imports MusicXML into the editable score', async ({ page })
   await expect(page.getByText('Đã nạp 3 ký hiệu từ 1 bè. Anh có thể kiểm tra và chỉnh sửa trên khuông nhạc.')).toBeVisible({ timeout: 10000 })
   await expect(page.locator('.paper h1')).toHaveText('OMR Fixture Sonata')
   await expect(page.locator('.notation-host [data-note-id]')).toHaveCount(3)
-  await expect(page.getByText('Đã nhập bản nhạc từ MusicXML')).toBeVisible()
+  await expect(page.locator('.omr-copy span')).toContainText('Đã nạp 3 ký hiệu từ 1 bè.')
 })
