@@ -16,6 +16,9 @@ function parseMusicXml(xml: string): ImportedScore {
   const notes: NoteItem[] = []
   let id = 1
   const durationMap: [number, Duration][] = [[4,'w'],[2,'h'],[1,'q'],[0.5,'8'],[0.25,'16'],[0.125,'32']]
+  const durationTypeMap: Record<string, Duration> = {
+    whole: 'w', half: 'h', quarter: 'q', eighth: '8', '16th': '16', '32nd': '32',
+  }
   let staffOffset = 0
   parts.forEach((part) => {
     const measures = Array.from(part.getElementsByTagName('measure'))
@@ -41,7 +44,8 @@ function parseMusicXml(xml: string): ImportedScore {
         const accidental: NoteItem['accidental'] = accidentalNode === 'sharp' || alter > 0 ? '#' : accidentalNode === 'flat' || alter < 0 ? 'b' : accidentalNode === 'natural' ? 'n' : ''
         const rawDuration = Number(note.querySelector('duration')?.textContent || divisions)
         const quarterLength = rawDuration / divisions
-        const duration = durationMap.reduce((best, item) => Math.abs(item[0] - quarterLength) < Math.abs(best[0] - quarterLength) ? item : best, durationMap[2])[1]
+        const notationType = note.querySelector('type')?.textContent?.trim() || ''
+        const duration = durationTypeMap[notationType] || durationMap.reduce((best, item) => Math.abs(item[0] - quarterLength) < Math.abs(best[0] - quarterLength) ? item : best, durationMap[2])[1]
         const dotted = !!note.querySelector('dot')
         const localStaff = Math.max(0, Number(note.querySelector('staff')?.textContent || '1') - 1)
         const startBeat = note.querySelector('chord') ? lastStartBeat : cursorBeat
