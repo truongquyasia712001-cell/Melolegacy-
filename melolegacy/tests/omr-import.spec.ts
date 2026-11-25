@@ -74,7 +74,7 @@ test('MusicXML keeps notated values for tuplets, rests, and dotted notes', async
     '    <note><pitch><step>E</step><octave>4</octave></pitch><duration>42</duration><type>quarter</type><dot/></note>',
     '  </measure></part>',
     '</score-partwise>',
-  ].join('\\n')
+  ].join('\n')
 
   await page.route('**/api/omr/jobs**', async route => {
     const request = route.request()
