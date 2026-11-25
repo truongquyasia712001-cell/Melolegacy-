@@ -24,6 +24,7 @@ MAX_UPLOAD_BYTES = int(os.getenv("OMR_MAX_UPLOAD_BYTES", str(40 * 1024 * 1024)))
 JOB_TIMEOUT_SECONDS = int(os.getenv("OMR_JOB_TIMEOUT_SECONDS", "900"))
 MAX_CONCURRENT_JOBS = max(1, int(os.getenv("OMR_MAX_CONCURRENT_JOBS", "1")))
 API_TOKEN = os.getenv("OMR_API_TOKEN", "").strip()
+PARALLEL_SYSTEMS = os.getenv("OMR_PARALLEL_SYSTEMS", "true").strip().lower() in {"1", "true", "yes", "on"}
 job_slots = threading.BoundedSemaphore(MAX_CONCURRENT_JOBS)
 
 app = FastAPI(
@@ -137,6 +138,7 @@ def process_job(job_id: str) -> None:
         try:
             command = [
                 AUDIVERIS_BIN,
+                *(["-constant", "org.audiveris.omr.ui.action.AdvancedTopics$Constants.processSystemsInParallel=true"] if PARALLEL_SYSTEMS else []),
                 "-batch",
                 "-export",
                 "-save",
