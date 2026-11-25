@@ -66,11 +66,35 @@ jobs:
           curl -fsS "http://localhost:8080/v1/jobs/$JOB_ID/musicxml" > /tmp/omr-result.musicxml
           python3 - <<'PY'
           import xml.etree.ElementTree as ET
+
           root = ET.parse('/tmp/omr-result.musicxml').getroot()
-          notes = [node for node in root.iter() if node.tag.endswith('note')]
-          if len(notes) < 3:
-              raise SystemExit(f'Expected at least 3 recognized notes, found {len(notes)}')
-          print(f'OMR smoke test passed: {len(notes)} MusicXML notes exported.')
+          actual = []
+          for note in (node for node in root.iter() if node.tag.endswith('note')):
+              if any(child.tag.endswith('rest') for child in note):
+                  continue
+              pitch = next((child for child in note if child.tag.endswith('pitch')), None)
+              if pitch is None:
+                  continue
+              step = next((child.text for child in pitch if child.tag.endswith('step')), None)
+              octave = next((child.text for child in pitch if child.tag.endswith('octave')), None)
+              note_type = next((child.text for child in note if child.tag.endswith('type')), None)
+              actual.append((step, octave, note_type))
+
+          expected = [
+              ('C', '4', 'quarter'),
+              ('D', '4', 'quarter'),
+              ('E', '4', 'quarter'),
+              ('F', '4', 'quarter'),
+              ('G', '4', 'half'),
+              ('E', '4', 'half'),
+          ]
+          matches = sum(a == e for a, e in zip(actual, expected))
+          accuracy = matches / len(expected)
+          print(f'OMR fixture note accuracy: {matches}/{len(expected)} = {accuracy:.1%}')
+          print(f'Expected sequence: {expected}')
+          print(f'Actual sequence:   {actual}')
+          if len(actual) != len(expected) or accuracy < 0.90:
+              raise SystemExit('OMR fixture failed the 90% note pitch/octave/duration acceptance threshold.')
           PY
       - name: Stop OMR service
         if: always()
